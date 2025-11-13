@@ -1,0 +1,35 @@
+# Virtual environment
+venv/
+env/
+
+# Data (NEVER commit)
+data/
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Legal acceptance (personal)
+.terms_accepted
