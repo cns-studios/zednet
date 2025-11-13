@@ -1,5 +1,5 @@
 """
-ZedNet Main Application Entry Point
+ZedNet Main Application Entry Point (Updated)
 """
 import sys
 import logging
@@ -7,11 +7,13 @@ from pathlib import Path
 import threading
 
 # Configure logging
+from config import LOGS_DIR
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s | %(levelname)-8s | %(name)s | %(message)s',
     handlers=[
-        logging.FileHandler('data/logs/zednet.log'),
+        logging.FileHandler(LOGS_DIR / 'zednet.log'),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -58,13 +60,13 @@ def main():
     
     # Import after logging is configured
     from config import (
-        CONTENT_DIR, LOGS_DIR, LOCAL_HOST, LOCAL_PORT,
+        DATA_DIR, CONTENT_DIR, LOGS_DIR, LOCAL_HOST, LOCAL_PORT,
         ENABLE_KILL_SWITCH, REQUIRE_VPN_CHECK
     )
     from core.audit_log import AuditLogger
     from core.killswitch import KillSwitch
     from core.vpn_check import VPNChecker
-    from core.p2p_engine import P2PEngine
+    from core.app_controller import AppController
     from server.local_server import initialize_server, run_server
     
     # Initialize audit logger
@@ -85,20 +87,21 @@ def main():
                 logger.info("Exiting for VPN setup")
                 sys.exit(0)
     
-    # Initialize P2P engine
-    logger.info("Initializing P2P engine...")
-    p2p_engine = P2PEngine(CONTENT_DIR)
+    # Initialize application controller
+    logger.info("Initializing application controller...")
+    controller = AppController(DATA_DIR)
     
+    if not controller.initialize():
+        logger.error("Failed to initialize application")
+        sys.exit(1)
+    
+    # Emergency shutdown callback
     def emergency_shutdown():
         """Emergency shutdown callback."""
         logger.critical("EMERGENCY SHUTDOWN TRIGGERED")
         logger.critical("Stopping all network activity...")
-        p2p_engine.shutdown()
+        controller.shutdown()
         logger.critical("Network activity stopped. Restart with VPN to continue.")
-    
-    if not p2p_engine.initialize(force_encryption=True):
-        logger.error("Failed to initialize P2P engine")
-        sys.exit(1)
     
     # Start kill switch
     if ENABLE_KILL_SWITCH:
@@ -120,18 +123,31 @@ def main():
     logger.info("="*70)
     logger.info("ZedNet is running")
     logger.info("Local server: http://%s:%d", LOCAL_HOST, LOCAL_PORT)
-    logger.info("Press Ctrl+C to stop")
     logger.info("="*70)
     
+    # Start GUI
     try:
-        # Keep main thread alive
-        server_thread.join()
-    except KeyboardInterrupt:
-        logger.info("Shutting down...")
-        p2p_engine.shutdown()
-        if ENABLE_KILL_SWITCH:
-            kill_switch.stop()
-        logger.info("Goodbye")
+        from gui.interface import ZedNetGUI
+        
+        logger.info("Starting GUI...")
+        gui = ZedNetGUI(controller)
+        gui.run()
+        
+    except ImportError as e:
+        logger.warning("GUI not available: %s", e)
+        logger.info("Running in headless mode. Press Ctrl+C to stop.")
+        
+        try:
+            # Keep main thread alive
+            server_thread.join()
+        except KeyboardInterrupt:
+            logger.info("Shutting down...")
+    
+    # Cleanup
+    controller.shutdown()
+    if ENABLE_KILL_SWITCH:
+        kill_switch.stop()
+    logger.info("Goodbye")
 
 
 if __name__ == '__main__':
