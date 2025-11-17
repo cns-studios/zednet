@@ -29,6 +29,7 @@ class KillSwitch:
         self.last_known_ip = None
         self.monitor_thread: Optional[threading.Thread] = None
         self.on_emergency_shutdown: Optional[Callable] = None
+        self._shutdown_triggered = False
         
     def start(self, on_emergency_shutdown: Callable):
         """
@@ -76,7 +77,7 @@ class KillSwitch:
                     )
             
             # CRITICAL: Trigger kill switch if VPN appears down
-            if not self.is_safe and was_safe:
+            if not self.is_safe and not self._shutdown_triggered:
                 logger.critical("VPN CONNECTION LOST - TRIGGERING EMERGENCY SHUTDOWN")
                 self._trigger_emergency_shutdown(status)
             
@@ -91,6 +92,7 @@ class KillSwitch:
     
     def _trigger_emergency_shutdown(self, status: dict):
         """Execute emergency shutdown."""
+        self._shutdown_triggered = True
         if self.audit_logger:
             self.audit_logger.log_event('EMERGENCY_SHUTDOWN', status)
         

@@ -57,7 +57,23 @@ class SecurityManager:
         except Exception as e:
             logger.error("Keypair generation failed: %s", e)
             raise
-    
+
+    @staticmethod
+    def get_public_key(private_key: bytes) -> bytes:
+        """
+        Derive public key from a private key.
+        """
+        try:
+            priv_key_obj = ed25519.Ed25519PrivateKey.from_private_bytes(private_key)
+            pub_key_obj = priv_key_obj.public_key()
+            return pub_key_obj.public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw
+            )
+        except Exception as e:
+            logger.error("Failed to derive public key: %s", e)
+            raise
+
     @staticmethod
     def derive_site_id(public_key: bytes) -> str:
         """Derive site ID from public key (SHA256)."""
@@ -76,6 +92,10 @@ class SecurityManager:
         """
         if not base_dir.is_absolute():
             raise ValueError("base_dir must be absolute")
+
+        # Block absolute paths (Unix and Windows)
+        if user_path.startswith('/') or user_path.startswith('\\') or re.match(r'^[a-zA-Z]:\\', user_path):
+            return None
         
         # Normalize and strip
         user_path = user_path.strip().strip('/\\')
