@@ -172,6 +172,12 @@ class ZedNetGUI:
         )
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.sites_tree.configure(yscrollcommand=scrollbar.set)
+
+        # Right-click menu
+        self.sites_menu = tk.Menu(self.sites_tree, tearoff=0)
+        self.sites_menu.add_command(label="Copy Site ID", command=self._copy_site_id)
+
+        self.sites_tree.bind("<Button-3>", self._show_sites_menu)
     
     def _create_downloads_tab(self):
         """Create downloads tab."""
@@ -319,7 +325,8 @@ class ZedNetGUI:
                     self.root.after(0, callback, result)
             except Exception as e:
                 logger.error(f"Async operation failed: {e}", exc_info=True)
-                self.root.after(0, lambda: messagebox.showerror("Error", f"An error occurred: {e}"))
+                # Capture exception in a lambda closure
+                self.root.after(0, lambda e=e: messagebox.showerror("Error", f"An error occurred: {e}"))
         
         future.add_done_callback(done_callback)
 
@@ -362,8 +369,7 @@ class ZedNetGUI:
             messagebox.showwarning("Warning", "Please select a site")
             return
         
-        item = self.sites_tree.item(selection[0])
-        site_id = item['values'][1] # Assuming Site ID is the second column
+        site_id = selection[0]
 
         password = self._ask_password()
 
@@ -411,6 +417,24 @@ class ZedNetGUI:
         
         # TODO: Implement stop seeding
         messagebox.showinfo("Info", "Stopped seeding")
+
+    def _show_sites_menu(self, event):
+        """Show right-click menu for my sites."""
+        selection = self.sites_tree.identify_row(event.y)
+        if selection:
+            self.sites_tree.selection_set(selection)
+            self.sites_menu.post(event.x_root, event.y_root)
+
+    def _copy_site_id(self):
+        """Copy selected site ID to clipboard."""
+        selection = self.sites_tree.selection()
+        if not selection:
+            return
+
+        site_id = selection[0]
+        self.root.clipboard_clear()
+        self.root.clipboard_append(site_id)
+        messagebox.showinfo("Copied", "Site ID copied to clipboard.")
     
     def _add_site_dialog(self):
         """Show add site dialog."""
@@ -440,9 +464,35 @@ class ZedNetGUI:
         ttk.Button(dialog, text="Add", command=add).pack(pady=10)
     
     def _remove_site(self):
-        """Remove selected site."""
-        # TODO: Implement
-        messagebox.showinfo("Info", "Not yet implemented")
+        """Remove selected site from my sites."""
+        selection = self.sites_tree.selection()
+        if not selection:
+            messagebox.showwarning("Warning", "Please select a site to remove.")
+            return
+
+        site_id = selection[0]
+
+        # Confirmation dialog
+        if not messagebox.askyesno(
+            "Confirm Deletion",
+            f"Are you sure you want to permanently delete site {site_id[:16]}...?"
+            "\nThis action cannot be undone."
+        ):
+            return
+
+        # Ask about private key
+        delete_key = messagebox.askyesno(
+            "Delete Private Key?",
+            "Do you also want to delete the private key for this site?"
+            "\nWARNING: Without the key, you can never publish updates again."
+            "\n(This is IRREVERSIBLE)"
+        )
+
+        if self.controller.delete_my_site(site_id, delete_key):
+            messagebox.showinfo("Success", "Site deleted successfully.")
+            self._update_sites_list()  # Refresh the list
+        else:
+            messagebox.showerror("Error", "Failed to delete site. See logs for details.")
     
     def _import_site_dialog(self):
         """Show import site dialog."""
@@ -498,6 +548,11 @@ class ZedNetGUI:
     
     def _update_sites_list(self):
         """Update my sites list."""
+        # Preserve selection
+        selected_id = None
+        if self.sites_tree.selection():
+            selected_id = self.sites_tree.selection()[0]
+
         # Clear existing
         for item in self.sites_tree.get_children():
             self.sites_tree.delete(item)
@@ -509,13 +564,21 @@ class ZedNetGUI:
             status = self.controller.get_site_status(site['site_id'])
             
             if status:
-                self.sites_tree.insert('', 'end', values=(
-                    site['site_name'],
-                    site['site_id'][:16] + '...',
-                    status.get('state', 'Unknown'),
-                    status.get('num_peers', 0),
-                    f"{status.get('upload_rate', 0):.1f} KB/s"
-                ))
+                self.sites_tree.insert(
+                    '', 'end',
+                    iid=site['site_id'],  # Use full site_id as item ID
+                    values=(
+                        site['site_name'],
+                        site['site_id'][:16] + '...',
+                        status.get('state', 'Unknown'),
+                        status.get('num_peers', 0),
+                        f"{status.get('upload_rate', 0):.1f} KB/s"
+                    )
+                )
+
+        # Restore selection
+        if selected_id and self.sites_tree.exists(selected_id):
+            self.sites_tree.selection_set(selected_id)
     
     def _update_downloads_list(self):
         """Update downloads list."""

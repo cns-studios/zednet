@@ -103,9 +103,28 @@ class AppController:
         return await self.downloader.add_site(site_id, auto_update)
     
     def remove_site(self, site_id: str, delete_files: bool = False):
-        """Remove a site."""
+        """Remove a downloaded site."""
         if self.downloader:
             self.downloader.remove_site(site_id, delete_files)
+
+    def delete_my_site(self, site_id: str, delete_key: bool = False):
+        """
+        Delete one of my sites.
+        This stops seeding and deletes all associated data.
+        """
+        logger.info(f"Deleting my site: {site_id}")
+        # Stop seeding if active
+        if self.publisher and site_id in self.publisher.active_sites:
+            self.publisher.stop_seeding(site_id)
+
+        # Delete from storage
+        try:
+            self.storage.delete_site(site_id, delete_key)
+            logger.info(f"Successfully deleted site data for: {site_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete site {site_id}: {e}", exc_info=True)
+            return False
     
     # Status methods
     
