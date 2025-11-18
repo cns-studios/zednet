@@ -1,17 +1,17 @@
 """
 Main application controller - coordinates all components.
 """
-import libtorrent as lt
+import asyncio
 from pathlib import Path
 import logging
 from typing import Dict, List, Optional
+import aiotorrent
 
 from .security import SecurityManager
 from .storage import SiteStorage
 from .publisher import SitePublisher
 from .downloader import SiteDownloader
 from .vpn_check import VPNChecker
-from .p2p_engine import P2PEngine
 
 logger = logging.getLogger(__name__)
 
@@ -23,16 +23,11 @@ class AppController:
     
     def __init__(self, data_dir: Path):
         self.data_dir = data_dir
-        
-        # Initialize components
         self.storage = SiteStorage(data_dir)
-        self.p2p_engine = P2PEngine(data_dir / 'sites')
-        self.session: Optional[lt.session] = None
-        
-        # Will be initialized after P2P engine starts
         self.publisher: Optional[SitePublisher] = None
         self.downloader: Optional[SiteDownloader] = None
-    
+        self._online = False
+
     def initialize(self) -> bool:
         """
         Initialize all components.
@@ -42,29 +37,31 @@ class AppController:
         """
         logger.info("Initializing application controller...")
         
-        # Initialize P2P engine
-        if not self.p2p_engine.initialize(force_encryption=True):
-            logger.error("Failed to initialize P2P engine")
+        try:
+            self.publisher = SitePublisher(self.storage)
+            self.downloader = SiteDownloader(self.storage)
+            self._online = True
+            logger.info("Application controller initialized successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize application controller: {e}")
             return False
-        
-        self.session = self.p2p_engine.session
-        
-        # Initialize publisher and downloader
-        self.publisher = SitePublisher(self.session, self.storage)
-        self.downloader = SiteDownloader(self.session, self.storage)
-        
-        logger.info("Application controller initialized successfully")
-        return True
-    
+
     def shutdown(self):
         """Shutdown all components."""
         logger.info("Shutting down application controller...")
-        
-        if self.p2p_engine:
-            self.p2p_engine.shutdown()
-        
+        if self.client and self._online:
+            # aiotorrent client doesn't have an explicit shutdown,
+            # but we can stop all torrents.
+            if self.publisher:
+                for site_id in list(self.publisher.active_sites.keys()):
+                    self.publisher.stop_seeding(site_id)
+            if self.downloader:
+                for site_id in list(self.downloader.active_downloads.keys()):
+                    self.downloader.remove_site(site_id)
+            self._online = False
         logger.info("Application controller shutdown complete")
-    
+
     # Site creation methods
     
     def create_site(self, site_name: str, content_dir: Path,
@@ -75,13 +72,13 @@ class AppController:
         
         return self.publisher.create_site(site_name, content_dir, password)
     
-    def publish_site(self, site_id: str, content_dir: Path,
+    async def publish_site(self, site_id: str, content_dir: Path,
                     private_key_file: Path, password: Optional[str] = None) -> bool:
         """Publish or update a site."""
         if not self.publisher:
             raise RuntimeError("Publisher not initialized")
         
-        return self.publisher.publish_site(
+        return await self.publisher.publish_site(
             site_id, content_dir, private_key_file, password
         )
     
@@ -92,12 +89,12 @@ class AppController:
     
     # Site downloading methods
     
-    def add_site(self, site_id: str, auto_update: bool = True) -> bool:
+    async def add_site(self, site_id: str, auto_update: bool = True) -> bool:
         """Add a site to download."""
         if not self.downloader:
             raise RuntimeError("Downloader not initialized")
         
-        return self.downloader.add_site(site_id, auto_update)
+        return await self.downloader.add_site(site_id, auto_update)
     
     def remove_site(self, site_id: str, delete_files: bool = False):
         """Remove a site."""
@@ -112,7 +109,7 @@ class AppController:
     
     def is_p2p_online(self) -> bool:
         """Check if P2P engine is online."""
-        return self.p2p_engine.is_online if self.p2p_engine else False
+        return self._online
     
     def get_my_sites(self) -> List[Dict]:
         """Get list of my published sites."""
@@ -126,7 +123,7 @@ class AppController:
         
         downloads = []
         for site_id in list(self.downloader.active_downloads.keys()):
-            status = self.downloader.get_download_status(site_id)
+            status = self.downloader.get_site_status(site_id)
             if status:
                 status['site_id'] = site_id
                 downloads.append(status)
@@ -141,7 +138,7 @@ class AppController:
                 return status
         
         if self.downloader:
-            status = self.downloader.get_download_status(site_id)
+            status = self.downloader.get_site_status(site_id)
             if status:
                 return status
         

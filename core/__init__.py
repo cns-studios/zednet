@@ -10,7 +10,6 @@ __author__ = "ZedNet Contributors"
 
 # Import main classes for easier access
 from .security import SecurityManager
-from .p2p_engine import P2PEngine
 from .publisher import SitePublisher
 from .downloader import SiteDownloader
 from .storage import SiteStorage
@@ -25,7 +24,6 @@ __all__ = [
     'SecurityManager',
     
     # P2P
-    'P2PEngine',
     'SitePublisher',
     'SiteDownloader',
     
