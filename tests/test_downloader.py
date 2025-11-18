@@ -6,7 +6,7 @@ from pathlib import Path
 import shutil
 import logging
 import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 from core.publisher import SitePublisher
 from core.downloader import SiteDownloader
 from core.storage import SiteStorage
@@ -15,6 +15,8 @@ from core.storage import SiteStorage
 def test_env():
     """Set up a test environment."""
     test_dir = Path("./test_env")
+    if test_dir.exists():
+        shutil.rmtree(test_dir)
     test_dir.mkdir(exist_ok=True)
     yield test_dir
     shutil.rmtree(test_dir)
@@ -27,33 +29,40 @@ async def test_download_site(test_env):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)-8s | %(name)-15s | %(message)s')
 
     storage = SiteStorage(test_env / "sites")
-    publisher = SitePublisher(storage)
     downloader = SiteDownloader(storage)
 
-    content_dir = test_env / "site_content"
-    content_dir.mkdir(exist_ok=True)
-    (content_dir / "index.html").write_text("<html><body>Hello, Downloader!</body></html>")
-
-    site_info = publisher.create_site("My Test Site", content_dir)
-    await publisher.publish_site(
-        site_info["site_id"], content_dir, Path(site_info["private_key_file"])
-    )
-
+    # 1. Create dummy metadata for a site
+    site_id = "a0cb9dbcb48b8c31ec6d0dde1e9fb50986092ff32a687eee2a83517b6a2e63e0"
     storage.save_site_metadata(
-        site_info["site_id"],
-        {"public_key": site_info["public_key"], "site_id": site_info["site_id"]},
+        site_id,
+        {
+            "public_key": "dummy_public_key",
+            "site_id": site_id,
+            "site_name": "My Test Site",
+        },
     )
 
-    # This test is a placeholder, as it requires a live DHT to resolve the site.
-    # In a real-world scenario, you would need a more sophisticated testing setup
-    # with a local DHT or a mocked DHT response.
+    # 2. Mock the DHT lookup and the Torrent object
     with patch('core.downloader.SiteDownloader._lookup_site_in_dht', new_callable=AsyncMock) as mock_lookup:
-        # Simulate a successful DHT lookup by returning a dummy info_hash
-        mock_lookup.return_value = b'dummy_info_hash_12345678901234567890'
+        mock_lookup.return_value = b'01234567890123456789'
 
-        success = await downloader.add_site(site_info["site_id"])
-        assert success, "Failed to add site to downloader"
+        mock_torrent_instance = MagicMock()
+        mock_torrent_instance.init = AsyncMock()
+        mock_torrent_instance.download = AsyncMock()
+        mock_file = MagicMock()
+        mock_torrent_instance.files = [mock_file]
 
-        # Further testing would require a running torrent client to download the content.
-        # For now, we'll just verify that the site was added to the downloader.
-        assert site_info["site_id"] in downloader.active_downloads
+        with patch('core.downloader.Torrent', return_value=mock_torrent_instance) as mock_torrent_class:
+
+            # 3. Run the downloader
+            success = await downloader.add_site(site_id)
+
+            # 4. Assert the results
+            assert success, "Failed to add site to downloader"
+            assert site_id in downloader.active_downloads
+
+            dummy_torrent_path = storage.get_site_content_dir(site_id) / "metadata.torrent"
+            assert dummy_torrent_path.exists(), "Dummy torrent file was not created"
+
+            mock_torrent_class.assert_called_once_with(str(dummy_torrent_path))
+            mock_torrent_instance.init.assert_awaited_once()

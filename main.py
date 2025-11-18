@@ -114,7 +114,7 @@ def main():
     
     # Initialize and start web server
     logger.info("Starting local web server on %s:%d", LOCAL_HOST, LOCAL_PORT)
-    initialize_server(audit_logger, CONTENT_DIR)
+    initialize_server(audit_logger, CONTENT_DIR, controller.storage)
     
     server_thread = threading.Thread(
         target=run_server,

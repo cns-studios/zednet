@@ -7,7 +7,10 @@ from tkinter import ttk, messagebox, filedialog, scrolledtext
 from pathlib import Path
 import threading
 import logging
+import asyncio
 from typing import Optional
+from queue import Queue
+from .log_handler import QueueHandler
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +35,20 @@ class ZedNetGUI:
         self._create_menu()
         self._create_status_bar()
         self._create_main_content()
-        
-        # Start update loop
+
+        # Set up asyncio event loop in a separate thread
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
+        self.thread.start()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
+
+        # Set up logging
+        self.log_queue = Queue()
+        queue_handler = QueueHandler(self.log_queue)
+        logging.getLogger().addHandler(queue_handler)
+
+        # Start update loops
+        self._process_log_queue()
         self._update_ui()
     
     def _create_menu(self):
@@ -255,26 +270,59 @@ class ZedNetGUI:
             if not site_name or not content_path:
                 messagebox.showerror("Error", "Please fill all required fields")
                 return
+
+            create_button.config(state="disabled")
+
+            def on_site_created(result):
+                if result:
+                    messagebox.showinfo(
+                        "Success",
+                        f"Site created!\n\nSite ID:\n{result['site_id']}\n\n"
+                        f"Share this ID with others to let them access your site."
+                    )
+                    self._update_sites_list()
+                    dialog.destroy()
+                else:
+                    # Re-enable button on failure
+                    create_button.config(state="normal")
+                    messagebox.showerror("Error", "Failed to create site. Check logs for details.")
             
+            coro = self.controller.create_site(
+                site_name,
+                Path(content_path),
+                password
+            )
+            self._run_async(coro, on_site_created)
+
+        create_button = ttk.Button(dialog, text="Create Site", command=create)
+        create_button.pack(pady=20)
+
+    def _on_closing(self):
+        """Handle window closing."""
+        logger.info("Closing application, stopping event loop.")
+        self.loop.call_soon_threadsafe(self.loop.stop)
+        # Wait for the thread to finish
+        self.thread.join(timeout=2)
+        self.root.destroy()
+
+    def _run_async(self, coro, callback=None):
+        """
+        Run a coroutine in the background event loop.
+        An optional callback can be executed with the result in the main thread.
+        """
+        future = asyncio.run_coroutine_threadsafe(coro, self.loop)
+
+        def done_callback(future):
             try:
-                result = self.controller.create_site(
-                    site_name,
-                    Path(content_path),
-                    password
-                )
-                
-                messagebox.showinfo(
-                    "Success",
-                    f"Site created!\n\nSite ID:\n{result['site_id']}\n\n"
-                    f"Share this ID with others to let them access your site."
-                )
-                dialog.destroy()
-                
+                result = future.result()
+                if callback:
+                    self.root.after(0, callback, result)
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to create site: {e}")
+                logger.error(f"Async operation failed: {e}", exc_info=True)
+                self.root.after(0, lambda: messagebox.showerror("Error", f"An error occurred: {e}"))
         
-        ttk.Button(dialog, text="Create Site", command=create).pack(pady=20)
-    
+        future.add_done_callback(done_callback)
+
     def _add_site_from_entry(self):
         """Add site from entry field."""
         site_id = self.site_id_entry.get().strip()
@@ -282,15 +330,16 @@ class ZedNetGUI:
             messagebox.showerror("Error", "Please enter a Site ID")
             return
         
-        try:
-            success = self.controller.add_site(site_id)
-            if success:
-                messagebox.showinfo("Success", f"Site added: {site_id}")
-                self.site_id_entry.delete(0, tk.END)
+        messagebox.showinfo("In Progress", f"Adding site: {site_id}...")
+
+        def on_site_added(result):
+            if result:
+                logger.info(f"Successfully started download for site: {site_id}")
             else:
-                messagebox.showerror("Error", "Failed to add site")
-        except Exception as e:
-            messagebox.showerror("Error", f"Error: {e}")
+                messagebox.showerror("Error", f"Failed to add site: {site_id}")
+
+        self._run_async(self.controller.add_site(site_id), on_site_added)
+        self.site_id_entry.delete(0, tk.END)
     
     def _open_site_in_browser(self):
         """Open selected site in browser."""
@@ -313,8 +362,45 @@ class ZedNetGUI:
             messagebox.showwarning("Warning", "Please select a site")
             return
         
-        # TODO: Implement publish dialog
-        messagebox.showinfo("Info", "Publishing... (not yet implemented)")
+        item = self.sites_tree.item(selection[0])
+        site_id = item['values'][1] # Assuming Site ID is the second column
+
+        password = self._ask_password()
+
+        messagebox.showinfo("In Progress", f"Publishing site: {site_id[:16]}...")
+
+        def on_site_published(result):
+            if result:
+                logger.info(f"Successfully started publishing site: {site_id}")
+            else:
+                messagebox.showerror("Error", f"Failed to publish site: {site_id}")
+
+        self._run_async(self.controller.publish_site(site_id, password), on_site_published)
+
+    def _ask_password(self) -> Optional[str]:
+        """Show a dialog to ask for a password."""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Password Required")
+        dialog.geometry("300x150")
+
+        ttk.Label(dialog, text="Enter private key password (if any):").pack(pady=10)
+
+        password_entry = ttk.Entry(dialog, show="*")
+        password_entry.pack(pady=5)
+        password_entry.focus_set()
+
+        password = None
+        def on_ok():
+            nonlocal password
+            password = password_entry.get()
+            dialog.destroy()
+
+        ttk.Button(dialog, text="OK", command=on_ok).pack(pady=10)
+
+        dialog.transient(self.root)
+        dialog.wait_window()
+
+        return password
     
     def _stop_seeding(self):
         """Stop seeding selected site."""
@@ -340,14 +426,16 @@ class ZedNetGUI:
         def add():
             site_id = entry.get().strip()
             if site_id:
-                try:
-                    if self.controller.add_site(site_id):
-                        messagebox.showinfo("Success", "Site added successfully")
-                        dialog.destroy()
+                messagebox.showinfo("In Progress", f"Adding site: {site_id}...")
+
+                def on_site_added(result):
+                    if result:
+                        logger.info(f"Successfully started download for site: {site_id}")
                     else:
-                        messagebox.showerror("Error", "Failed to add site")
-                except Exception as e:
-                    messagebox.showerror("Error", str(e))
+                        messagebox.showerror("Error", f"Failed to add site: {site_id}")
+
+                self._run_async(self.controller.add_site(site_id), on_site_added)
+                dialog.destroy()
         
         ttk.Button(dialog, text="Add", command=add).pack(pady=10)
     
@@ -448,6 +536,14 @@ class ZedNetGUI:
                 download.get('num_peers', 0)
             ))
     
+    def _process_log_queue(self):
+        """Process log queue."""
+        while not self.log_queue.empty():
+            message = self.log_queue.get()
+            self.log_text.insert(tk.END, message + '\n')
+            self.log_text.see(tk.END)
+        self.root.after(100, self._process_log_queue)
+
     def run(self):
         """Run the GUI."""
         self.root.mainloop()

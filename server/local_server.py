@@ -5,6 +5,7 @@ from flask import Flask, send_file, abort, render_template_string, request
 from pathlib import Path
 from core.security import SecurityManager
 from core.audit_log import AuditLogger
+from core.storage import SiteStorage
 import logging
 from functools import wraps
 import time
@@ -18,6 +19,7 @@ app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max request
 # Global instances (injected at startup)
 audit_logger: AuditLogger = None
 content_dir: Path = None
+storage: SiteStorage = None
 
 # Rate limiting
 request_times = {}
@@ -190,14 +192,20 @@ def serve_site(site_id: str, filepath: str):
                 'client_ip': client_ip
             })
         abort(400, "Invalid site ID format")
-    
-    # Construct site directory
-    site_dir = content_dir / site_id
+
+    # Determine base directory
+    metadata = storage.load_site_metadata(site_id)
+    if metadata and 'content_path' in metadata:
+        # It's one of our own sites, serve from original path
+        site_dir = Path(metadata['content_path'])
+    else:
+        # It's a downloaded site
+        site_dir = content_dir / site_id
     
     if not site_dir.exists():
         if audit_logger:
             audit_logger.log_file_access(site_id, filepath, False, client_ip)
-        abort(404, "Site not found - not downloaded")
+        abort(404, "Site not found - not downloaded or path is invalid")
     
     # CRITICAL: Sanitize path
     safe_path = SecurityManager.sanitize_path(filepath, site_dir)
@@ -252,11 +260,12 @@ def internal_error_handler(e):
     return "Internal server error", 500
 
 
-def initialize_server(audit_log: AuditLogger, content_directory: Path):
+def initialize_server(audit_log: AuditLogger, content_directory: Path, site_storage: SiteStorage):
     """Initialize server with dependencies."""
-    global audit_logger, content_dir
+    global audit_logger, content_dir, storage
     audit_logger = audit_log
     content_dir = content_directory
+    storage = site_storage
 
 
 def run_server(host='127.0.0.1', port=9999):

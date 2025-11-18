@@ -64,7 +64,7 @@ class AppController:
 
     # Site creation methods
     
-    def create_site(self, site_name: str, content_dir: Path,
+    async def create_site(self, site_name: str, content_dir: Path,
                    password: Optional[str] = None) -> Dict:
         """Create a new site."""
         if not self.publisher:
@@ -72,12 +72,18 @@ class AppController:
         
         return self.publisher.create_site(site_name, content_dir, password)
     
-    async def publish_site(self, site_id: str, content_dir: Path,
-                    private_key_file: Path, password: Optional[str] = None) -> bool:
+    async def publish_site(self, site_id: str, password: Optional[str] = None) -> bool:
         """Publish or update a site."""
         if not self.publisher:
             raise RuntimeError("Publisher not initialized")
         
+        metadata = self.storage.load_site_metadata(site_id)
+        if not metadata:
+            raise ValueError(f"Site not found: {site_id}")
+
+        content_dir = Path(metadata['content_path'])
+        private_key_file = self.storage.keys_dir / f"{site_id}.key"
+
         return await self.publisher.publish_site(
             site_id, content_dir, private_key_file, password
         )
@@ -113,8 +119,7 @@ class AppController:
     
     def get_my_sites(self) -> List[Dict]:
         """Get list of my published sites."""
-        sites = self.storage.list_sites()
-        return [s for s in sites if 'public_key' in s]
+        return self.storage.list_sites()
     
     def get_downloads(self) -> List[Dict]:
         """Get list of downloading sites."""
@@ -142,4 +147,8 @@ class AppController:
             if status:
                 return status
         
+        metadata = self.storage.load_site_metadata(site_id)
+        if metadata and 'status' in metadata:
+            return {"state": metadata['status']}
+
         return None
