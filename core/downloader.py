@@ -7,7 +7,7 @@ import logging
 from .security import SecurityManager
 from .storage import SiteStorage
 import aiotorrent
-from aiotorrent import Torrent
+from .torrent import ZedNetTorrent as Torrent
 from fastbencode import bdecode
 
 logger = logging.getLogger(__name__)
@@ -68,16 +68,17 @@ class SiteDownloader:
         save_path = self.storage.get_site_content_dir(site_id)
         save_path.mkdir(parents=True, exist_ok=True)
         
-        torrent = Torrent(info_hash)
-        client = aiotorrent.Client()
-        await client.start(torrent, save_path=str(save_path))
+        torrent = Torrent(info_hash=info_hash)
+        await torrent.init(dht_enabled=True)
         
         self.active_downloads[site_id] = {
             'torrent': torrent,
-            'client': client,
             'auto_update': auto_update
         }
         logger.info("Started downloading site: %s", site_id)
+
+        for file in torrent.files:
+            await torrent.download(file, save_path=save_path)
 
     def get_site_status(self, site_id: str) -> Optional[Dict]:
         """Get download progress for a site."""
@@ -89,4 +90,11 @@ class SiteDownloader:
             "progress": torrent.progress,
         }
 
-    # ... (other methods)
+    def remove_site(self, site_id: str, delete_files: bool = False):
+        """Remove a site."""
+        if site_id in self.active_downloads:
+            del self.active_downloads[site_id]
+            logger.info("Removed site from downloader: %s", site_id)
+
+        if delete_files:
+            self.storage.delete_site(site_id)

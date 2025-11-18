@@ -9,7 +9,7 @@ import time
 from .security import SecurityManager
 from .storage import SiteStorage
 import aiotorrent
-from aiotorrent import Torrent
+from .torrent import ZedNetTorrent as Torrent
 from fastbencode import bencode
 import torf
 
@@ -77,7 +77,7 @@ class SitePublisher:
             
             torrent = await self._create_torrent(content_dir)
             await torrent.init()
-            info_hash = torrent.info_hash
+            info_hash = torrent.torrent_info['info_hash']
             
             await self._publish_to_dht(site_id, info_hash, private_key)
             
@@ -139,4 +139,21 @@ class SitePublisher:
         self.active_sites[site_id] = {"torrent": torrent, "client": client}
         logger.info("Started seeding site: %s", site_id)
 
-    # ... (other methods)
+    def get_site_status(self, site_id: str) -> Optional[Dict]:
+        """Get status for a specific site."""
+        if site_id not in self.active_sites:
+            return None
+
+        torrent = self.active_sites[site_id]['torrent']
+        return {
+            "state": "Seeding",
+            "num_peers": len(torrent.peers),
+            "upload_rate": 0  # To be implemented
+        }
+
+    def stop_seeding(self, site_id: str):
+        """Stop seeding a site."""
+        if site_id in self.active_sites:
+            # aiotorrent doesn't have a clean stop method, so we just drop it
+            del self.active_sites[site_id]
+            logger.info("Stopped seeding site: %s", site_id)

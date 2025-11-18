@@ -50,7 +50,7 @@ class AppController:
     def shutdown(self):
         """Shutdown all components."""
         logger.info("Shutting down application controller...")
-        if self.client and self._online:
+        if self._online:
             # aiotorrent client doesn't have an explicit shutdown,
             # but we can stop all torrents.
             if self.publisher:

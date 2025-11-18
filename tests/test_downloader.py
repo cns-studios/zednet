@@ -31,7 +31,7 @@ async def test_download_site(test_env):
     downloader = SiteDownloader(storage)
 
     content_dir = test_env / "site_content"
-    content_dir.mkdir()
+    content_dir.mkdir(exist_ok=True)
     (content_dir / "index.html").write_text("<html><body>Hello, Downloader!</body></html>")
 
     site_info = publisher.create_site("My Test Site", content_dir)
