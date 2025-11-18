@@ -150,6 +150,12 @@ class ZedNetGUI:
             command=self._stop_seeding
         ).pack(side=tk.LEFT, padx=2)
         
+        ttk.Button(
+            toolbar,
+            text="Remove Site",
+            command=self._remove_site
+        ).pack(side=tk.LEFT, padx=2)
+
         # Sites list
         columns = ('Name', 'Site ID', 'Status', 'Peers', 'Upload')
         self.sites_tree = ttk.Treeview(
@@ -176,6 +182,8 @@ class ZedNetGUI:
         # Right-click menu
         self.sites_menu = tk.Menu(self.sites_tree, tearoff=0)
         self.sites_menu.add_command(label="Copy Site ID", command=self._copy_site_id)
+        self.sites_menu.add_separator()
+        self.sites_menu.add_command(label="Remove Site", command=self._remove_site)
 
         self.sites_tree.bind("<Button-3>", self._show_sites_menu)
     
