@@ -13,7 +13,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s | %(levelname)-8s | %(name)s | %(message)s',
     handlers=[
-        logging.FileHandler(LOGS_DIR / 'zednet.log'),
+        logging.FileHandler(LOGS_DIR / 'zednet.log', encoding='utf-8'),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -33,7 +33,7 @@ def check_legal_acceptance():
     
     terms_file = BASE_DIR / 'legal' / 'TERMS_OF_SERVICE.md'
     if terms_file.exists():
-        print(terms_file.read_text())
+        print(terms_file.read_text(encoding='utf-8'))
     else:
         print("WARNING: Terms file not found!")
     
@@ -74,6 +74,7 @@ def main():
     logger.info("Audit logging initialized")
     
     # Check VPN status
+    kill_switch_enabled = ENABLE_KILL_SWITCH
     if REQUIRE_VPN_CHECK:
         logger.info("Checking VPN status...")
         vpn_status = VPNChecker.check_vpn_status()
@@ -86,6 +87,8 @@ def main():
             if response != 'yes':
                 logger.info("Exiting for VPN setup")
                 sys.exit(0)
+            else:
+                kill_switch_enabled = False
     
     # Initialize application controller
     logger.info("Initializing application controller...")
@@ -104,14 +107,14 @@ def main():
         logger.critical("Network activity stopped. Restart with VPN to continue.")
     
     # Start kill switch
-    if ENABLE_KILL_SWITCH:
+    if kill_switch_enabled:
         logger.info("Starting VPN kill switch...")
         kill_switch = KillSwitch(check_interval=30, audit_logger=audit_logger)
         kill_switch.start(emergency_shutdown)
     
     # Initialize and start web server
     logger.info("Starting local web server on %s:%d", LOCAL_HOST, LOCAL_PORT)
-    initialize_server(audit_logger, CONTENT_DIR)
+    initialize_server(audit_logger, CONTENT_DIR, controller.storage)
     
     server_thread = threading.Thread(
         target=run_server,

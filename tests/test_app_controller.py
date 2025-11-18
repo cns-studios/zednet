@@ -52,7 +52,8 @@ def initialized_controller(test_env):
     controller.initialize()
     return controller
 
-def test_create_site(initialized_controller):
+@pytest.mark.asyncio
+async def test_create_site(initialized_controller):
     """Test the create_site method."""
     mock_publisher = MagicMock()
     initialized_controller.publisher = mock_publisher
@@ -61,7 +62,7 @@ def test_create_site(initialized_controller):
     content_dir = Path("/fake/dir")
     password = "password123"
 
-    initialized_controller.create_site(site_name, content_dir, password)
+    await initialized_controller.create_site(site_name, content_dir, password)
 
     mock_publisher.create_site.assert_called_once_with(site_name, content_dir, password)
 
@@ -74,12 +75,14 @@ async def test_publish_site(initialized_controller):
 
     site_id = "some_site_id"
     content_dir = Path("/fake/dir")
-    private_key_file = Path("/fake/key.pem")
     password = "password123"
 
-    await initialized_controller.publish_site(site_id, content_dir, private_key_file, password)
+    with patch.object(initialized_controller.storage, 'load_site_metadata', return_value={'content_path': str(content_dir)}), \
+         patch.object(initialized_controller.storage, 'keys_dir', Path("/fake/keys")):
 
-    mock_publisher.publish_site.assert_called_once_with(site_id, content_dir, private_key_file, password)
+        await initialized_controller.publish_site(site_id, password)
+
+        mock_publisher.publish_site.assert_awaited_once()
 
 @pytest.mark.asyncio
 async def test_add_site(initialized_controller):

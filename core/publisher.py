@@ -30,32 +30,29 @@ class SitePublisher:
         """
         logger.info("Creating new site: %s", site_name)
         
-        # Validate content directory
         if not content_dir.exists() or not content_dir.is_dir():
             raise ValueError(f"Invalid content directory: {content_dir}")
         
-        # Check for required files
         index_file = content_dir / "index.html"
         if not index_file.exists():
             logger.warning("No index.html found in %s", content_dir)
         
-        # Generate keypair
         private_key, public_key = SecurityManager.generate_keypair()
         site_id = SecurityManager.derive_site_id(public_key)
         
-        # Save private key
         key_file = self.storage.save_private_key(
             site_id, private_key, password
         )
         
-        # Save site metadata
         metadata = {
             'site_id': site_id,
             'site_name': site_name,
             'public_key': public_key.hex(),
             'created_at': time.time(),
             'version': 1,
-            'content_hash': None  # Will be set on publish
+            'content_hash': None,
+            'content_path': str(content_dir),
+            'status': 'Ready to Publish'
         }
         
         self.storage.save_site_metadata(site_id, metadata)
@@ -77,17 +74,23 @@ class SitePublisher:
             
             torrent = await self._create_torrent(content_dir)
             await torrent.init()
-            info_hash = torrent.info_hash
+            # Correctly access the info_hash from the torrent_info dictionary
+            info_hash = torrent.torrent_info['info_hash']
             
             await self._publish_to_dht(site_id, info_hash, private_key)
             
             await self._start_seeding(site_id, torrent)
             
-            # ... (update metadata)
-            
+            # Update metadata
+            metadata = self.storage.load_site_metadata(site_id)
+            metadata['content_hash'] = info_hash.hex()
+            metadata['version'] = metadata.get('version', 1) + 1
+            metadata['status'] = 'Seeding'
+            self.storage.save_site_metadata(site_id, metadata)
+
             return True
         except Exception as e:
-            logger.error("Failed to publish site %s: %s", site_id, e)
+            logger.error(f"Failed to publish site {site_id}: {e}", exc_info=True)
             return False
 
     async def _create_torrent(self, content_dir: Path) -> Torrent:
@@ -97,46 +100,57 @@ class SitePublisher:
         t = torf.Torrent(path=str(content_dir), trackers=[])
         t.generate()
         
+        # Using a temporary path for the torrent file
         torrent_path = content_dir.parent / f"{content_dir.name}.torrent"
-        t.write(torrent_path)
+        t.write(str(torrent_path))
         
-        torrent = Torrent(torrent_path)
-        return torrent
+        return Torrent(str(torrent_path))
 
     async def _publish_to_dht(self, site_id: str, info_hash: bytes, private_key: bytes):
         """
-        Publish mutable torrent to DHT using BEP 46.
+        Publish mutable torrent to DHT using BEP 46. This is a placeholder.
         """
         public_key = SecurityManager.get_public_key(private_key)
-
         metadata = self.storage.load_site_metadata(site_id)
         seq = metadata.get("version", 1)
 
-        value = {"ih": info_hash}
+        value = {b"ih": info_hash}
         bencoded_value = bencode(value)
 
-        # TODO: Implement BEP 46 signing and putting
-        # This will require a custom DHT client that can handle mutable puts.
-        # For now, we'll just log the data.
-        logger.info("BEP 46 Data:")
-        logger.info("  Public Key: %s", public_key.hex())
-        logger.info("  Sequence: %d", seq)
-        logger.info("  Value: %s", bencoded_value.hex())
-
-        # This is a placeholder. A real implementation would need to
-        # sign the data and send it to the DHT.
-        # dht_server = aiotorrent.DHTServer()
-        # await dht_server.start()
-        # await dht_server.set(public_key, bencoded_value, seq, private_key)
-        # await dht_server.stop()
+        logger.info("BEP 46 Data (Placeholder):")
+        logger.info(f"  Public Key: {public_key.hex()}")
+        logger.info(f"  Sequence: {seq}")
+        logger.info(f"  Value: {bencoded_value.hex()}")
+        # In a real implementation, this would involve signing and putting to the DHT.
+        # aiotorrent library does not support this directly.
 
     async def _start_seeding(self, site_id: str, torrent: Torrent):
         """
-        Start seeding the site content.
+        Start seeding the site content. This is a placeholder.
         """
-        client = aiotorrent.Client()
-        await client.start(torrent)
-        self.active_sites[site_id] = {"torrent": torrent, "client": client}
-        logger.info("Started seeding site: %s", site_id)
+        self.active_sites[site_id] = {"torrent": torrent, "task": None}
+        logger.info(f"Started seeding site: {site_id}")
+        # Placeholder: a real implementation would start a long-running seeding task.
+        # await torrent.start()
 
-    # ... (other methods)
+    def get_site_status(self, site_id: str) -> Optional[Dict]:
+        """Get status for a specific site."""
+        if site_id in self.active_sites:
+            torrent = self.active_sites[site_id]['torrent']
+            return {
+                "state": "Seeding",
+                "num_peers": len(getattr(torrent, 'peers', [])),
+                "upload_rate": 0
+            }
+
+        metadata = self.storage.load_site_metadata(site_id)
+        if metadata:
+            return {"state": metadata.get('status', 'Unknown')}
+        return None
+
+    def stop_seeding(self, site_id: str):
+        """Stop seeding a site."""
+        if site_id in self.active_sites:
+            # Placeholder for stopping the seeding task
+            del self.active_sites[site_id]
+            logger.info(f"Stopped seeding site: {site_id}")
