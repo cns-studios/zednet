@@ -19,3 +19,4 @@ pytest-asyncio
 black>=23.0.0
 flake8>=6.0.0
 mypy>=1.4.0
+torf

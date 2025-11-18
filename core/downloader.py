@@ -7,6 +7,7 @@ import logging
 from .security import SecurityManager
 from .storage import SiteStorage
 import aiotorrent
+from aiotorrent import Torrent
 from fastbencode import bdecode
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ class SiteDownloader:
         save_path = self.storage.get_site_content_dir(site_id)
         save_path.mkdir(parents=True, exist_ok=True)
         
-        torrent = aiotorrent.Torrent(info_hash=info_hash)
+        torrent = Torrent(info_hash)
         client = aiotorrent.Client()
         await client.start(torrent, save_path=str(save_path))
         

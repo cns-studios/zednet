@@ -9,6 +9,7 @@ import time
 from .security import SecurityManager
 from .storage import SiteStorage
 import aiotorrent
+from aiotorrent import Torrent
 from fastbencode import bencode
 import torf
 
@@ -75,6 +76,7 @@ class SitePublisher:
             private_key = self.storage.load_private_key(private_key_file, password)
             
             torrent = await self._create_torrent(content_dir)
+            await torrent.init()
             info_hash = torrent.info_hash
             
             await self._publish_to_dht(site_id, info_hash, private_key)
@@ -88,7 +90,7 @@ class SitePublisher:
             logger.error("Failed to publish site %s: %s", site_id, e)
             return False
 
-    async def _create_torrent(self, content_dir: Path) -> aiotorrent.Torrent:
+    async def _create_torrent(self, content_dir: Path) -> Torrent:
         """
         Create torrent from directory.
         """
@@ -98,8 +100,7 @@ class SitePublisher:
         torrent_path = content_dir.parent / f"{content_dir.name}.torrent"
         t.write(torrent_path)
         
-        torrent = aiotorrent.Torrent(path=str(torrent_path))
-        await torrent.init()
+        torrent = Torrent(torrent_path)
         return torrent
 
     async def _publish_to_dht(self, site_id: str, info_hash: bytes, private_key: bytes):
@@ -129,7 +130,7 @@ class SitePublisher:
         # await dht_server.set(public_key, bencoded_value, seq, private_key)
         # await dht_server.stop()
 
-    async def _start_seeding(self, site_id: str, torrent: aiotorrent.Torrent):
+    async def _start_seeding(self, site_id: str, torrent: Torrent):
         """
         Start seeding the site content.
         """
