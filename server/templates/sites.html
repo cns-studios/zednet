@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% block title %}All Sites - ZedNet{% endblock %}
+
+{% block content %}
+<h1>All Listed Sites</h1>
+<p>This is a list of all publicly registered sites on the ZedNet network.</p>
+
+{% if sites %}
+    <div class="site-list">
+    {% for site in sites %}
+        <div class="site-item">
+            <h3>{{ site.name }}</h3>
+            <p>{{ site.description }}</p>
+            <code>{{ site.site_id }}</code>
+        </div>
+    {% endfor %}
+    </div>
+{% else %}
+    <div class="card">
+        <p>No sites are currently listed. Check back later or add your own!</p>
+    </div>
+{% endif %}
+
+{% endblock %}

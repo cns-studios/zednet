@@ -1,0 +1,15 @@
+# Netlify configuration file
+# This file tells Netlify how to build and deploy your site, including serverless functions.
+
+[build]
+  # This project doesn't have a static site build command, as it's a Python app.
+  # We only need to specify the functions directory.
+  functions = "netlify/functions/"
+
+# The functions section is implicitly handled by the [build] settings above,
+# but you could define specific function settings here if needed.
+# For example:
+# [functions]
+#   node_bundler = "esbuild"
+#   [functions.submit-site]
+#     # specific settings for the submit-site function
