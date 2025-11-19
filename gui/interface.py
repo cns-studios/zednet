@@ -35,12 +35,8 @@ class ZedNetGUI:
         # Create UI
         self._create_menu()
         self._create_main_content()
-        self._create_status_bar() # Moved to end for better layout
+        self._create_status_bar()
 
-        # Set up asyncio event loop in a separate thread
-        self.loop = asyncio.new_event_loop()
-        self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
-        self.thread.start()
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
 
         # Set up logging
@@ -296,29 +292,26 @@ class ZedNetGUI:
 
     def _on_closing(self):
         """Handle window closing."""
-        logger.info("Closing application, stopping event loop.")
-        self.loop.call_soon_threadsafe(self.loop.stop)
-        # Wait for the thread to finish
-        self.thread.join(timeout=2)
+        logger.info("Closing GUI.")
         self.root.destroy()
 
     def _run_async(self, coro, callback: Optional[Callable] = None):
         """
-        Run a coroutine in the background event loop.
+        Run a coroutine on the controller's event loop.
         An optional callback can be executed with the result in the main thread.
         """
-        future = asyncio.run_coroutine_threadsafe(coro, self.loop)
-
-        def done_callback(future_result):
+        async def coroutine_wrapper():
             try:
-                result = future_result.result()
+                result = await coro
                 if callback:
                     self.root.after(0, callback, result)
             except Exception as e:
                 logger.error(f"Async operation failed: {e}", exc_info=True)
                 self.root.after(0, lambda e=e: self._show_status_message(f"Error: {e}"))
-        
-        future.add_done_callback(done_callback)
+
+        self.controller.loop.call_soon_threadsafe(
+            asyncio.create_task, coroutine_wrapper()
+        )
 
     def _run_in_thread(self, target_func: Callable, callback: Optional[Callable] = None):
         """

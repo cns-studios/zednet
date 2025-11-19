@@ -97,6 +97,8 @@ def main():
     if not controller.initialize():
         logger.error("Failed to initialize application")
         sys.exit(1)
+
+    controller.start()
     
     # Emergency shutdown callback
     def emergency_shutdown():

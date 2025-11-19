@@ -4,7 +4,9 @@ Main application controller - coordinates all components.
 import asyncio
 from pathlib import Path
 import logging
-from typing import Dict, List, Optional
+import threading
+from concurrent.futures import Future
+from typing import Dict, List, Optional, Any, Callable, Coroutine
 import aiotorrent
 import requests
 
@@ -31,6 +33,10 @@ class AppController:
         self.forum_manager: Optional[ForumManager] = None
         self._online = False
 
+        # Asyncio event loop management
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
+
     def initialize(self) -> bool:
         """
         Initialize all components.
@@ -45,12 +51,27 @@ class AppController:
             self.downloader = SiteDownloader(self.storage)
             self.forum_manager = ForumManager(self.storage.data_dir, self.downloader)
             self._online = True
-            asyncio.create_task(self._sync_forum_periodically())
             logger.info("Application controller initialized successfully")
             return True
         except Exception as e:
             logger.error(f"Failed to initialize application controller: {e}")
             return False
+
+    def start(self):
+        """Start the controller's event loop and background tasks."""
+        logger.info("Starting AppController event loop...")
+        self.thread.start()
+        self.loop.call_soon_threadsafe(
+            asyncio.create_task, self._sync_forum_periodically()
+        )
+
+    def run_async_and_wait(self, coro: Coroutine) -> Any:
+        """
+        Run a coroutine on the controller's event loop from a synchronous context
+        and wait for the result.
+        """
+        future: Future = asyncio.run_coroutine_threadsafe(coro, self.loop)
+        return future.result()
 
     async def _sync_forum_periodically(self):
         """Periodically syncs the forum data."""
@@ -73,6 +94,10 @@ class AppController:
                 for site_id in list(self.downloader.active_downloads.keys()):
                     self.downloader.remove_site(site_id)
             self._online = False
+
+        # Stop the event loop
+        self.loop.call_soon_threadsafe(self.loop.stop)
+        self.thread.join(timeout=2)
         logger.info("Application controller shutdown complete")
 
     # Site creation methods
