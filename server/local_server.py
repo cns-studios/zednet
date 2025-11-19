@@ -1,25 +1,29 @@
 """
 Production-hardened local web server.
 """
-from flask import Flask, send_file, abort, render_template_string, request
+from flask import Flask, send_file, abort, render_template, request, flash, redirect, url_for
 from pathlib import Path
+import requests
 from core.security import SecurityManager
 from core.audit_log import AuditLogger
 from core.storage import SiteStorage
 import logging
 from functools import wraps
 import time
+import json
 
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates', static_folder='static')
 app.config['DEBUG'] = False
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max request
+app.config['SECRET_KEY'] = 'a_secure_random_secret_key_for_flashing' # In a real app, use a proper secret
 
 # Global instances (injected at startup)
 audit_logger: AuditLogger = None
 content_dir: Path = None
 storage: SiteStorage = None
+app_controller = None # Injected AppController instance
 
 # Rate limiting
 request_times = {}
@@ -56,124 +60,126 @@ def rate_limit(f):
     return decorated_function
 
 
-DASHBOARD_HTML = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZedNet Local Node</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Courier New', monospace;
-            background: #0a0a0a;
-            color: #00ff00;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        .container { max-width: 900px; margin: 0 auto; }
-        h1 { 
-            font-size: 2em; 
-            margin-bottom: 20px;
-            border-bottom: 2px solid #00ff00;
-            padding-bottom: 10px;
-        }
-        .warning {
-            background: #ff0000;
-            color: #fff;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 5px;
-            font-weight: bold;
-        }
-        .safe {
-            background: #00ff00;
-            color: #000;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 5px;
-            font-weight: bold;
-        }
-        .info {
-            background: #222;
-            padding: 15px;
-            margin: 10px 0;
-            border-left: 4px solid #00ff00;
-        }
-        code {
-            background: #1a1a1a;
-            padding: 2px 6px;
-            border-radius: 3px;
-            color: #00ffff;
-        }
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #333;
-            font-size: 0.9em;
-            color: #666;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>⚡ ZedNet Local Node v{{ version }}</h1>
-        
-        <div class="{{ status_class }}">
-            🔒 VPN Status: {{ vpn_status }}
-        </div>
-        
-        <div class="info">
-            <strong>Local Server:</strong> http://127.0.0.1:{{ port }}<br>
-            <strong>Status:</strong> ✓ Online<br>
-            <strong>Encryption:</strong> ✓ Enabled (Required)<br>
-            <strong>Audit Logging:</strong> ✓ Active
-        </div>
-        
-        <div class="info">
-            <h3>⚠️ Security Notice</h3>
-            <ul style="margin-left: 20px; margin-top: 10px;">
-                <li>Always use a VPN or Tor for anonymity</li>
-                <li>This node only serves content locally (127.0.0.1)</li>
-                <li>Report illegal content using the GUI</li>
-                <li>You are responsible for content you access</li>
-            </ul>
-        </div>
-        
-        <div class="info">
-            <h3>📡 Access Sites</h3>
-            <p>URL Format:</p>
-            <code>http://127.0.0.1:{{ port }}/site/&lt;SITE_ID&gt;/index.html</code>
-            <p style="margin-top: 10px;">
-                <small>Use the GUI application to add sites and browse content.</small>
-            </p>
-        </div>
-        
-        <div class="footer">
-            ZedNet is experimental software. Use at your own risk.<br>
-            Read the Terms of Service and Privacy Policy before use.
-        </div>
-    </div>
-</body>
-</html>
-"""
-
-
 @app.route('/')
 @rate_limit
 def dashboard():
-    """Serve dashboard."""
-    from config import VERSION, LOCAL_PORT
-    
-    # TODO: Get actual VPN status
-    return render_template_string(
-        DASHBOARD_HTML,
-        version=VERSION,
-        port=LOCAL_PORT,
-        vpn_status="CHECK GUI",
-        status_class="warning"
+    """Serve the main dashboard."""
+    if not app_controller:
+        abort(503, "Controller not initialized")
+
+    return render_template(
+        "dashboard.html",
+        p2p_status=app_controller.is_p2p_online(),
+        vpn_status=app_controller.get_vpn_status(),
+        my_sites_count=len(app_controller.get_my_sites()),
+        downloaded_sites_count=len(app_controller.get_downloads()),
+        my_sites=app_controller.get_my_sites()
     )
+
+def _get_public_sites():
+    """Helper to load and return the public sites list."""
+    # In a future step, this will fetch from a URL. For now, read from disk.
+    sites_file = storage.data_dir / "sites.json"
+    if not sites_file.exists():
+        return []
+    try:
+        with open(sites_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        logger.error(f"Failed to read or parse sites.json: {e}")
+        return []
+
+@app.route('/sites')
+@rate_limit
+def list_sites():
+    """Serve a list of all public sites."""
+    sites = _get_public_sites()
+    return render_template("sites.html", sites=sites)
+
+
+@app.route('/search')
+@rate_limit
+def search_sites():
+    """Serve the search page and handle search queries."""
+    query = request.args.get('q', '').strip().lower()
+    sites = _get_public_sites()
+
+    if query:
+        results = [
+            site for site in sites
+            if query in site.get('name', '').lower()
+        ]
+    else:
+        results = [] # Don't show results on initial page load
+
+    return render_template("search.html", sites=results, query=query)
+
+
+@app.route('/add-site', methods=['GET', 'POST'])
+@rate_limit
+def add_site():
+    """Handle site submission form."""
+    if request.method == 'POST':
+        if not app_controller:
+            abort(503, "Controller not initialized")
+
+        site_name = request.form.get('site_name')
+        site_id = request.form.get('site_id')
+        description = request.form.get('description')
+
+        if not all([site_name, site_id, description]):
+            flash('All fields are required.', 'danger')
+            return redirect(url_for('add_site'))
+
+        # Run the submission in the background
+        async def do_submit():
+            success = await app_controller.submit_site_for_registration(
+                site_name, site_id, description
+            )
+            if success:
+                flash('Your site has been submitted for review!', 'success')
+            else:
+                flash('There was an error submitting your site. Please try again.', 'danger')
+
+        # This is a simple way to run an async task from a sync Flask route
+        # In a more complex app, a task queue like Celery would be better.
+        app_controller.loop.call_soon_threadsafe(asyncio.create_task, do_submit())
+
+        # Redirect immediately, feedback will be on the next page load
+        flash("Your submission is being processed...", "info")
+        return redirect(url_for('add_site'))
+
+    return render_template('add_site.html')
+
+
+@app.route('/forum', methods=['GET'])
+@rate_limit
+def forum():
+    """Display the forum page."""
+    if not app_controller or not app_controller.forum_manager:
+        abort(503, "Forum not initialized")
+
+    forum_data = app_controller.forum_manager.get_all_posts()
+    return render_template('forum.html', forum_data=forum_data)
+
+
+@app.route('/forum/new', methods=['POST'])
+@rate_limit
+def new_forum_post():
+    """Handle new post submission."""
+    if not app_controller or not app_controller.forum_manager:
+        abort(503, "Forum not initialized")
+
+    author = request.form.get('author', 'Anonymous')
+    content = request.form.get('content')
+
+    if not content:
+        flash("Content is required for a post.", "danger")
+    else:
+        app_controller.forum_manager.add_post(author, content)
+        flash("Your post has been added!", "success")
+
+    return redirect(url_for('forum'))
 
 
 @app.route('/site/<site_id>/<path:filepath>')
@@ -260,9 +266,10 @@ def internal_error_handler(e):
     return "Internal server error", 500
 
 
-def initialize_server(audit_log: AuditLogger, content_directory: Path, site_storage: SiteStorage):
+def initialize_server(controller, audit_log: AuditLogger, content_directory: Path, site_storage: SiteStorage):
     """Initialize server with dependencies."""
-    global audit_logger, content_dir, storage
+    global app_controller, audit_logger, content_dir, storage
+    app_controller = controller
     audit_logger = audit_log
     content_dir = content_directory
     storage = site_storage

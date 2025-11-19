@@ -1,0 +1,48 @@
+{% extends "layout.html" %}
+{% block title %}Dashboard - ZedNet{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+<div class="card-grid">
+    <div class="card">
+        <h3>P2P Status</h3>
+        {% if p2p_status %}
+            <p><span class="status-indicator online"></span>Online</p>
+        {% else %}
+            <p><span class="status-indicator offline"></span>Offline</p>
+        {% endif %}
+    </div>
+    <div class="card">
+        <h3>VPN Status</h3>
+        {% if vpn_status.appears_safe %}
+             <p><span class="status-indicator online"></span>Active</p>
+        {% else %}
+            <p><span class="status-indicator offline"></span>Warning</p>
+        {% endif %}
+    </div>
+    <div class="card">
+        <h3>My Sites</h3>
+        <p class="value">{{ my_sites_count }}</p>
+    </div>
+    <div class="card">
+        <h3>Downloaded Sites</h3>
+        <p class="value">{{ downloaded_sites_count }}</p>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <h3>Recently Seeded Sites</h3>
+    {% if my_sites %}
+        <ul class="site-list">
+        {% for site in my_sites[:5] %} {# Display up to 5 sites #}
+            <li class="site-item">
+                <h3>{{ site.site_name }}</h3>
+                <code>{{ site.site_id }}</code>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>You are not seeding any sites yet. Create one from the desktop app!</p>
+    {% endif %}
+</div>
+{% endblock %}

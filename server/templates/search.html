@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% block title %}Search Sites - ZedNet{% endblock %}
+
+{% block content %}
+<h1>Search Sites</h1>
+<p>Find specific sites by name in the public directory.</p>
+
+<form class="search-form" method="get" action="/search">
+    <input type="search" name="q" placeholder="Enter a site name to search for..." value="{{ query or '' }}">
+</form>
+
+{% if query and sites %}
+    <h2>Results for "{{ query }}"</h2>
+    <div class="site-list">
+    {% for site in sites %}
+        <div class="site-item">
+            <h3>{{ site.name }}</h3>
+            <p>{{ site.description }}</p>
+            <code>{{ site.site_id }}</code>
+        </div>
+    {% endfor %}
+    </div>
+{% elif query and not sites %}
+    <div class="card" style="margin-top: 20px;">
+        <p>No sites found matching your query: "{{ query }}"</p>
+    </div>
+{% endif %}
+
+{% endblock %}

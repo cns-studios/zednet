@@ -26,7 +26,8 @@ def test_app_controller_initialization(test_env):
     assert controller.publisher is None
     assert controller.downloader is None
 
-def test_app_controller_successful_initialization(test_env):
+@pytest.mark.asyncio
+async def test_app_controller_successful_initialization(test_env):
     """Test the main initialization method of the AppController."""
     controller = AppController(test_env)
     result = controller.initialize()
@@ -35,7 +36,8 @@ def test_app_controller_successful_initialization(test_env):
     assert controller.publisher is not None
     assert controller.downloader is not None
 
-def test_app_controller_failed_initialization(test_env):
+@pytest.mark.asyncio
+async def test_app_controller_failed_initialization(test_env):
     """Test the main initialization method of the AppController when aiotorrent fails."""
     with patch('core.app_controller.SitePublisher', side_effect=Exception("Failed to start")):
         controller = AppController(test_env)
@@ -62,9 +64,9 @@ async def test_create_site(initialized_controller):
     content_dir = Path("/fake/dir")
     password = "password123"
 
-    await initialized_controller.create_site(site_name, content_dir, password)
-
-    mock_publisher.create_site.assert_called_once_with(site_name, content_dir, password)
+    with patch('asyncio.to_thread') as mock_to_thread:
+        await initialized_controller.create_site(site_name, content_dir, password)
+        mock_to_thread.assert_called_once_with(mock_publisher.create_site, site_name, content_dir, password)
 
 @pytest.mark.asyncio
 async def test_publish_site(initialized_controller):

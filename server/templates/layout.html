@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ZedNet{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('zednet-theme', theme);
+        }
+        function loadTheme() {
+            const storedTheme = localStorage.getItem('zednet-theme') || 'light';
+            setTheme(storedTheme);
+        }
+        document.addEventListener('DOMContentLoaded', loadTheme);
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <a href="/">⚡ ZedNet</a>
+            </div>
+            <nav class="nav">
+                <a href="/">Dashboard</a>
+                <a href="/sites">Sites</a>
+                <a href="/search">Search</a>
+                <a href="/add-site">Add Site</a>
+                <a href="/forum">Forum</a>
+            </nav>
+            <div class="theme-switcher">
+                <button onclick="setTheme('light')">Light</button>
+                <button onclick="setTheme('dark')">Dark</button>
+            </div>
+        </header>
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+        <footer class="footer">
+            <p>ZedNet is experimental software. Use at your own risk.</p>
+        </footer>
+    </div>
+</body>
+</html>

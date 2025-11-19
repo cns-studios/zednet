@@ -6,12 +6,14 @@ from pathlib import Path
 import logging
 from typing import Dict, List, Optional
 import aiotorrent
+import requests
 
 from .security import SecurityManager
 from .storage import SiteStorage
 from .publisher import SitePublisher
 from .downloader import SiteDownloader
 from .vpn_check import VPNChecker
+from .forum_manager import ForumManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,7 @@ class AppController:
         self.storage = SiteStorage(data_dir)
         self.publisher: Optional[SitePublisher] = None
         self.downloader: Optional[SiteDownloader] = None
+        self.forum_manager: Optional[ForumManager] = None
         self._online = False
 
     def initialize(self) -> bool:
@@ -40,12 +43,22 @@ class AppController:
         try:
             self.publisher = SitePublisher(self.storage)
             self.downloader = SiteDownloader(self.storage)
+            self.forum_manager = ForumManager(self.storage.data_dir, self.downloader)
             self._online = True
+            asyncio.create_task(self._sync_forum_periodically())
             logger.info("Application controller initialized successfully")
             return True
         except Exception as e:
             logger.error(f"Failed to initialize application controller: {e}")
             return False
+
+    async def _sync_forum_periodically(self):
+        """Periodically syncs the forum data."""
+        while self._online:
+            if self.forum_manager:
+                logger.info("Syncing forum data...")
+                await self.forum_manager.sync_forum()
+            await asyncio.sleep(300) # Sync every 5 minutes
 
     def shutdown(self):
         """Shutdown all components."""
@@ -66,14 +79,20 @@ class AppController:
     
     async def create_site(self, site_name: str, content_dir: Path,
                    password: Optional[str] = None) -> Dict:
-        """Create a new site."""
+        """Create a new site. Offloaded to a thread to avoid blocking."""
         if not self.publisher:
             raise RuntimeError("Publisher not initialized")
         
-        return self.publisher.create_site(site_name, content_dir, password)
+        # Run the synchronous, blocking function in a separate thread
+        return await asyncio.to_thread(
+            self.publisher.create_site, site_name, content_dir, password
+        )
     
     async def publish_site(self, site_id: str, password: Optional[str] = None) -> bool:
-        """Publish or update a site."""
+        """
+        Publish or update a site. This involves I/O and can block, so it's
+        partially offloaded.
+        """
         if not self.publisher:
             raise RuntimeError("Publisher not initialized")
         
@@ -171,3 +190,32 @@ class AppController:
             return {"state": metadata['status']}
 
         return None
+
+    async def submit_site_for_registration(self, name: str, site_id: str, description: str) -> bool:
+        """Submits a site to the central registration API."""
+        # TODO: Replace with the actual Netlify function URL
+        netlify_url = "https://your-netlify-site.netlify.app/.netlify/functions/submit-site"
+
+        payload = {
+            "name": name,
+            "site_id": site_id,
+            "description": description
+        }
+
+        try:
+            # Using asyncio-friendly HTTP client would be ideal, but for simplicity:
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.post(netlify_url, json=payload, timeout=10)
+            )
+
+            if response.status_code == 200:
+                logger.info("Successfully submitted site for registration: %s", site_id)
+                return True
+            else:
+                logger.error("Failed to submit site %s. Status: %d", site_id, response.status_code)
+                return False
+        except Exception as e:
+            logger.error("Error submitting site %s: %s", site_id, e)
+            return False

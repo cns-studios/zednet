@@ -1,0 +1,198 @@
+/* General Reset & Root Variables */
+:root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    /* Light Theme */
+    --bg-light: #FFFFFF;
+    --surface-light: #F7F7F7;
+    --text-light: #333333;
+    --text-secondary-light: #777777;
+    --primary-light: #007AFF;
+    --border-light: #EAEAEA;
+
+    /* Dark Theme */
+    --bg-dark: #2F2F2F;
+    --surface-dark: #3A3A3A;
+    --text-dark: #EAEAEA;
+    --text-secondary-dark: #AAAAAA;
+    --primary-dark: #0A84FF;
+    --border-dark: #444444;
+}
+
+[data-theme="light"] {
+    --bg-color: var(--bg-light);
+    --surface-color: var(--surface-light);
+    --text-color: var(--text-light);
+    --text-secondary-color: var(--text-secondary-light);
+    --primary-color: var(--primary-light);
+    --border-color: var(--border-light);
+}
+
+[data-theme="dark"] {
+    --bg-color: var(--bg-dark);
+    --surface-color: var(--surface-dark);
+    --text-color: var(--text-dark);
+    --text-secondary-color: var(--text-secondary-dark);
+    --primary-color: var(--primary-dark);
+    --border-color: var(--border-dark);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header & Navigation */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 30px;
+}
+
+.logo a {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: var(--text-color);
+    text-decoration: none;
+}
+
+.nav a {
+    margin-left: 20px;
+    color: var(--text-secondary-color);
+    text-decoration: none;
+    font-size: 1em;
+    transition: color 0.2s;
+}
+
+.nav a:hover {
+    color: var(--primary-color);
+}
+
+.theme-switcher button {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary-color);
+    padding: 5px 10px;
+    margin-left: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.theme-switcher button:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* Main Content */
+.main-content {
+    min-height: 70vh;
+}
+
+h1, h2 {
+    color: var(--text-color);
+    margin-bottom: 20px;
+}
+
+p {
+    margin-bottom: 15px;
+    color: var(--text-secondary-color);
+}
+
+code {
+    background-color: var(--surface-color);
+    padding: 3px 6px;
+    border-radius: 4px;
+    color: var(--primary-color);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+}
+
+/* Dashboard Cards */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.card {
+    background-color: var(--surface-color);
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.card h3 {
+    margin-bottom: 10px;
+    color: var(--text-color);
+}
+
+.card .value {
+    font-size: 2em;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+.status-indicator.online { background-color: #43A047; }
+.status-indicator.offline { background-color: #E53935; }
+
+/* Site List & Search */
+.site-list {
+    list-style: none;
+}
+
+.site-item {
+    background-color: var(--surface-color);
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    border-left: 4px solid var(--primary-color);
+}
+
+.site-item h3 {
+    margin-bottom: 5px;
+}
+
+.search-form input {
+    width: 100%;
+    padding: 12px;
+    font-size: 1em;
+    border-radius: 5px;
+    border: 1px solid var(--border-color);
+    background-color: var(--surface-color);
+    color: var(--text-color);
+}
+
+/* Footer */
+.footer {
+    text-align: center;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-secondary-color);
+    font-size: 0.9em;
+}

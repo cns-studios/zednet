@@ -1,0 +1,112 @@
+{% extends "layout.html" %}
+{% block title %}Forum - ZedNet{% endblock %}
+
+{% block content %}
+<h1>Decentralized Forum</h1>
+<p>Discuss topics with other ZedNet users. Updates are fetched periodically from the network.</p>
+
+<div class="card add-post-card">
+    <h3>Create a New Post</h3>
+    <form class="add-post-form" method="post" action="/forum/new">
+        <div class="form-group">
+            <input type="text" name="author" required placeholder="Your Nickname">
+        </div>
+        <div class="form-group">
+            <textarea name="content" rows="4" required placeholder="What's on your mind?"></textarea>
+        </div>
+        <div class="form-group">
+            <button type="submit">Post to Forum</button>
+        </div>
+    </form>
+</div>
+
+<div class="forum-posts">
+    <h2>Latest Posts</h2>
+    {% if forum_data and forum_data.posts %}
+        {% for post in forum_data.posts | reverse %}
+            <div class="post-item card">
+                <div class="post-content">
+                    <p>{{ post.content }}</p>
+                </div>
+                <div class="post-meta">
+                    <span>By: <strong>{{ post.author or 'Anonymous' }}</strong></span>
+                    <span>At: <small>{{ post.timestamp | replace("T", " ") | replace("Z", "") }}</small></span>
+                    <span class="votes">
+                        👍 {{ post.votes.up | length }} | 👎 {{ post.votes.down | length }}
+                    </span>
+                </div>
+                <div class="post-replies">
+                    {% if post.replies %}
+                        <h5>Replies:</h5>
+                        {% for reply in post.replies %}
+                            <div class="reply-item">
+                                <p>{{ reply.content }}</p>
+                                <div class="post-meta">
+                                    <span>By: <strong>{{ reply.author or 'Anonymous' }}</strong></span>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>No posts found. Be the first to create one!</p>
+    {% endif %}
+</div>
+
+<style>
+.add-post-card { margin-bottom: 30px; }
+.add-post-form input, .add-post-form textarea {
+    width: 100%;
+    padding: 10px;
+    font-size: 1em;
+    border-radius: 5px;
+    border: 1px solid var(--border-color);
+    background-color: var(--surface-color);
+    color: var(--text-color);
+    margin-bottom: 10px;
+}
+.add-post-form button {
+    padding: 10px 15px;
+    font-size: 1em;
+    border-radius: 5px;
+    border: none;
+    background-color: var(--primary-color);
+    color: white;
+    cursor: pointer;
+}
+.post-item {
+    margin-bottom: 20px;
+    padding: 20px;
+}
+.post-meta {
+    font-size: 0.9em;
+    color: var(--text-secondary-color);
+    border-top: 1px solid var(--border-color);
+    margin-top: 15px;
+    padding-top: 10px;
+    display: flex;
+    justify-content: space-between;
+}
+.post-replies {
+    margin-top: 15px;
+    padding-left: 20px;
+    border-left: 3px solid var(--border-color);
+}
+.reply-item {
+    font-size: 0.95em;
+    margin-top: 10px;
+    background-color: var(--bg-color);
+    padding: 10px;
+    border-radius: 5px;
+}
+.reply-item .post-meta {
+    border: none;
+    padding-top: 5px;
+    margin-top: 5px;
+    font-size: 0.8em;
+}
+
+</style>
+{% endblock %}

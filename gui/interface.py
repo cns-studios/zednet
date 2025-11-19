@@ -8,15 +8,16 @@ from pathlib import Path
 import threading
 import logging
 import asyncio
-from typing import Optional
+from typing import Optional, Callable
 from queue import Queue
 from .log_handler import QueueHandler
+from .theme import Theme
 
 logger = logging.getLogger(__name__)
 
 class ZedNetGUI:
     """Main GUI application."""
-    
+
     def __init__(self, app_controller):
         """
         Args:
@@ -25,16 +26,16 @@ class ZedNetGUI:
         self.controller = app_controller
         self.root = tk.Tk()
         self.root.title("ZedNet - Decentralized Web")
-        self.root.geometry("900x600")
+        self.root.geometry("1000x650")
         
         # Style
         self.style = ttk.Style()
-        self.style.theme_use('clam')
+        self._set_theme('light')
         
         # Create UI
         self._create_menu()
-        self._create_status_bar()
         self._create_main_content()
+        self._create_status_bar() # Moved to end for better layout
 
         # Set up asyncio event loop in a separate thread
         self.loop = asyncio.new_event_loop()
@@ -59,52 +60,50 @@ class ZedNetGUI:
         # File menu
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Create Site", command=self._create_site_dialog)
-        file_menu.add_command(label="Import Site", command=self._import_site_dialog)
+        file_menu.add_command(label="Create Site...", command=self._create_site_dialog)
+        file_menu.add_command(label="Import Site...", command=self._import_site_dialog)
         file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.root.quit)
+        file_menu.add_command(label="Exit", command=self._on_closing)
         
-        # Sites menu
-        sites_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Sites", menu=sites_menu)
-        sites_menu.add_command(label="Add Site", command=self._add_site_dialog)
-        sites_menu.add_command(label="Remove Site", command=self._remove_site)
-        
+        # View menu (for theme switching)
+        view_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="View", menu=view_menu)
+        view_menu.add_command(label="Light Mode", command=lambda: self._set_theme('light'))
+        view_menu.add_command(label="Dark Mode", command=lambda: self._set_theme('dark'))
+
         # Help menu
         help_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About", command=self._show_about)
         help_menu.add_command(label="Terms of Service", command=self._show_terms)
-    
+
+    def _set_theme(self, mode: str):
+        """Set the application theme."""
+        self.current_theme = mode
+        Theme.apply_theme(self.style, mode)
+
+        # Update specific widget colors that don't auto-update
+        log_bg = Theme.DARK_SURFACE if mode == 'dark' else Theme.LIGHT_SURFACE
+        log_fg = Theme.DARK_TEXT if mode == 'dark' else Theme.LIGHT_TEXT
+        if hasattr(self, 'log_text'):
+            self.log_text.config(background=log_bg, foreground=log_fg)
+
     def _create_status_bar(self):
         """Create status bar."""
         self.status_frame = ttk.Frame(self.root)
-        self.status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        self.status_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=2)
         
-        # VPN status
-        self.vpn_label = ttk.Label(
-            self.status_frame,
-            text="VPN: Checking...",
-            foreground="orange"
-        )
-        self.vpn_label.pack(side=tk.LEFT, padx=5)
-        
-        # P2P status
-        self.p2p_label = ttk.Label(
-            self.status_frame,
-            text="P2P: Offline",
-            foreground="red"
-        )
-        self.p2p_label.pack(side=tk.LEFT, padx=5)
-        
-        # Server status
-        self.server_label = ttk.Label(
-            self.status_frame,
-            text="Server: http://127.0.0.1:9999",
-            foreground="green"
-        )
-        self.server_label.pack(side=tk.RIGHT, padx=5)
-    
+        self.status_label_left = ttk.Label(self.status_frame, text="Welcome to ZedNet", style="Status.TLabel")
+        self.status_label_left.pack(side=tk.LEFT, padx=5)
+
+        self.status_label_right = ttk.Label(self.status_frame, text="Server: http://127.0.0.1:9999", style="Status.TLabel")
+        self.status_label_right.pack(side=tk.RIGHT, padx=5)
+
+    def _show_status_message(self, message: str, duration_ms: int = 4000):
+        """Display a temporary message in the status bar."""
+        self.status_label_left.config(text=message)
+        self.root.after(duration_ms, lambda: self.status_label_left.config(text=""))
+
     def _create_main_content(self):
         """Create main content area."""
         # Create notebook (tabs)
@@ -128,34 +127,6 @@ class ZedNetGUI:
     
     def _create_sites_tab(self):
         """Create my sites tab."""
-        # Toolbar
-        toolbar = ttk.Frame(self.sites_frame)
-        toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
-        
-        ttk.Button(
-            toolbar,
-            text="Create Site",
-            command=self._create_site_dialog
-        ).pack(side=tk.LEFT, padx=2)
-        
-        ttk.Button(
-            toolbar,
-            text="Publish",
-            command=self._publish_site
-        ).pack(side=tk.LEFT, padx=2)
-        
-        ttk.Button(
-            toolbar,
-            text="Stop Seeding",
-            command=self._stop_seeding
-        ).pack(side=tk.LEFT, padx=2)
-        
-        ttk.Button(
-            toolbar,
-            text="Remove Site",
-            command=self._remove_site
-        ).pack(side=tk.LEFT, padx=2)
-
         # Sites list
         columns = ('Name', 'Site ID', 'Status', 'Peers', 'Upload')
         self.sites_tree = ttk.Treeview(
@@ -166,8 +137,13 @@ class ZedNetGUI:
         
         for col in columns:
             self.sites_tree.heading(col, text=col)
-            self.sites_tree.column(col, width=150)
         
+        self.sites_tree.column('Name', width=200)
+        self.sites_tree.column('Site ID', width=250)
+        self.sites_tree.column('Status', width=100)
+        self.sites_tree.column('Peers', width=80)
+        self.sites_tree.column('Upload', width=120)
+
         self.sites_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Scrollbar
@@ -176,14 +152,20 @@ class ZedNetGUI:
             orient=tk.VERTICAL,
             command=self.sites_tree.yview
         )
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.sites_tree.configure(yscrollcommand=scrollbar.set)
+        # Place scrollbar inside the frame but pack it to the right
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.sites_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
 
         # Right-click menu
         self.sites_menu = tk.Menu(self.sites_tree, tearoff=0)
+        self.sites_menu.add_command(label="Publish Site", command=self._publish_site)
+        self.sites_menu.add_command(label="Stop Seeding", command=self._stop_seeding)
+        self.sites_menu.add_separator()
         self.sites_menu.add_command(label="Copy Site ID", command=self._copy_site_id)
         self.sites_menu.add_separator()
-        self.sites_menu.add_command(label="Remove Site", command=self._remove_site)
+        self.sites_menu.add_command(label="Remove Site...", command=self._remove_site)
 
         self.sites_tree.bind("<Button-3>", self._show_sites_menu)
     
@@ -193,22 +175,16 @@ class ZedNetGUI:
         toolbar = ttk.Frame(self.downloads_frame)
         toolbar.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
         
-        ttk.Label(toolbar, text="Site ID:").pack(side=tk.LEFT, padx=2)
+        ttk.Label(toolbar, text="Site ID:").pack(side=tk.LEFT, padx=(0, 5))
         
-        self.site_id_entry = ttk.Entry(toolbar, width=70)
-        self.site_id_entry.pack(side=tk.LEFT, padx=2)
+        self.site_id_entry = ttk.Entry(toolbar)
+        self.site_id_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
         ttk.Button(
             toolbar,
             text="Add Site",
             command=self._add_site_from_entry
-        ).pack(side=tk.LEFT, padx=2)
-        
-        ttk.Button(
-            toolbar,
-            text="Open in Browser",
-            command=self._open_site_in_browser
-        ).pack(side=tk.LEFT, padx=2)
+        ).pack(side=tk.LEFT, padx=5)
         
         # Downloads list
         columns = ('Site ID', 'Progress', 'Status', 'Down', 'Up', 'Peers')
@@ -220,7 +196,13 @@ class ZedNetGUI:
         
         for col in columns:
             self.downloads_tree.heading(col, text=col)
-            self.downloads_tree.column(col, width=140)
+
+        self.downloads_tree.column('Site ID', width=250)
+        self.downloads_tree.column('Progress', width=100)
+        self.downloads_tree.column('Status', width=100)
+        self.downloads_tree.column('Down', width=120)
+        self.downloads_tree.column('Up', width=120)
+        self.downloads_tree.column('Peers', width=80)
         
         self.downloads_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
@@ -241,6 +223,7 @@ class ZedNetGUI:
             font=('Courier', 9)
         )
         self.log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self._set_theme(self.current_theme) # Apply theme to log viewer
     
     def _create_site_dialog(self):
         """Show create site dialog."""
@@ -299,7 +282,7 @@ class ZedNetGUI:
                 else:
                     # Re-enable button on failure
                     create_button.config(state="normal")
-                    messagebox.showerror("Error", "Failed to create site. Check logs for details.")
+                    self._show_status_message("Error: Failed to create site.")
             
             coro = self.controller.create_site(
                 site_name,
@@ -319,24 +302,39 @@ class ZedNetGUI:
         self.thread.join(timeout=2)
         self.root.destroy()
 
-    def _run_async(self, coro, callback=None):
+    def _run_async(self, coro, callback: Optional[Callable] = None):
         """
         Run a coroutine in the background event loop.
         An optional callback can be executed with the result in the main thread.
         """
         future = asyncio.run_coroutine_threadsafe(coro, self.loop)
 
-        def done_callback(future):
+        def done_callback(future_result):
             try:
-                result = future.result()
+                result = future_result.result()
                 if callback:
                     self.root.after(0, callback, result)
             except Exception as e:
                 logger.error(f"Async operation failed: {e}", exc_info=True)
-                # Capture exception in a lambda closure
-                self.root.after(0, lambda e=e: messagebox.showerror("Error", f"An error occurred: {e}"))
+                self.root.after(0, lambda e=e: self._show_status_message(f"Error: {e}"))
         
         future.add_done_callback(done_callback)
+
+    def _run_in_thread(self, target_func: Callable, callback: Optional[Callable] = None):
+        """
+        Run a synchronous (blocking) function in a separate thread.
+        An optional callback can be executed with the result in the main thread.
+        """
+        def thread_target():
+            try:
+                result = target_func()
+                if callback:
+                    self.root.after(0, callback, result)
+            except Exception as e:
+                logger.error(f"Threaded operation failed: {e}", exc_info=True)
+                self.root.after(0, lambda e=e: self._show_status_message(f"Error: {e}"))
+
+        threading.Thread(target=thread_target, daemon=True).start()
 
     def _add_site_from_entry(self):
         """Add site from entry field."""
@@ -345,13 +343,13 @@ class ZedNetGUI:
             messagebox.showerror("Error", "Please enter a Site ID")
             return
         
-        messagebox.showinfo("In Progress", f"Adding site: {site_id}...")
+        self._show_status_message(f"Adding site: {site_id[:16]}...")
 
         def on_site_added(result):
             if result:
-                logger.info(f"Successfully started download for site: {site_id}")
+                self._show_status_message(f"Successfully added site: {site_id[:16]}")
             else:
-                messagebox.showerror("Error", f"Failed to add site: {site_id}")
+                self._show_status_message(f"Failed to add site: {site_id[:16]}")
 
         self._run_async(self.controller.add_site(site_id), on_site_added)
         self.site_id_entry.delete(0, tk.END)
@@ -381,13 +379,13 @@ class ZedNetGUI:
 
         password = self._ask_password()
 
-        messagebox.showinfo("In Progress", f"Publishing site: {site_id[:16]}...")
+        self._show_status_message(f"Publishing site: {site_id[:16]}...")
 
         def on_site_published(result):
             if result:
-                logger.info(f"Successfully started publishing site: {site_id}")
+                self._show_status_message(f"Successfully published site: {site_id[:16]}")
             else:
-                messagebox.showerror("Error", f"Failed to publish site: {site_id}")
+                self._show_status_message(f"Failed to publish site: {site_id[:16]}")
 
         self._run_async(self.controller.publish_site(site_id, password), on_site_published)
 
@@ -424,7 +422,7 @@ class ZedNetGUI:
             return
         
         # TODO: Implement stop seeding
-        messagebox.showinfo("Info", "Stopped seeding")
+        self._show_status_message("Stop seeding functionality not yet implemented.")
 
     def _show_sites_menu(self, event):
         """Show right-click menu for my sites."""
@@ -496,11 +494,20 @@ class ZedNetGUI:
             "\n(This is IRREVERSIBLE)"
         )
 
-        if self.controller.delete_my_site(site_id, delete_key):
-            messagebox.showinfo("Success", "Site deleted successfully.")
-            self._update_sites_list()  # Refresh the list
-        else:
-            messagebox.showerror("Error", "Failed to delete site. See logs for details.")
+        self._show_status_message(f"Deleting site: {site_id[:16]}...")
+
+        def on_site_deleted(success):
+            if success:
+                self._show_status_message("Site deleted successfully.")
+                self._update_sites_list()  # Refresh the list
+            else:
+                self._show_status_message("Error: Failed to delete site.")
+
+        # Run the blocking delete operation in a separate thread
+        self._run_in_thread(
+            lambda: self.controller.delete_my_site(site_id, delete_key),
+            on_site_deleted
+        )
     
     def _import_site_dialog(self):
         """Show import site dialog."""
@@ -529,18 +536,13 @@ class ZedNetGUI:
     def _update_ui(self):
         """Update UI elements periodically."""
         try:
-            # Update VPN status
+            # Update status bar indicators
             vpn_status = self.controller.get_vpn_status()
-            if vpn_status['appears_safe']:
-                self.vpn_label.config(text="VPN: Active", foreground="green")
-            else:
-                self.vpn_label.config(text="VPN: WARNING", foreground="red")
+            vpn_text = "VPN: Active" if vpn_status['appears_safe'] else "VPN: WARNING"
+            p2p_text = "P2P: Online" if self.controller.is_p2p_online() else "P2P: Offline"
             
-            # Update P2P status
-            if self.controller.is_p2p_online():
-                self.p2p_label.config(text="P2P: Online", foreground="green")
-            else:
-                self.p2p_label.config(text="P2P: Offline", foreground="red")
+            # Combine status and update right label
+            self.status_label_right.config(text=f"{vpn_text}  |  {p2p_text}  |  Server: http://127.0.0.1:9999")
             
             # Update sites list
             self._update_sites_list()
