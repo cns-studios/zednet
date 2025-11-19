@@ -114,7 +114,7 @@ def main():
     
     # Initialize and start web server
     logger.info("Starting local web server on %s:%d", LOCAL_HOST, LOCAL_PORT)
-    initialize_server(audit_logger, CONTENT_DIR, controller.storage)
+    initialize_server(audit_logger, CONTENT_DIR, controller)
     
     server_thread = threading.Thread(
         target=run_server,
@@ -130,15 +130,17 @@ def main():
     
     # Start GUI
     try:
+        # Import tkinter here to catch TclError if it occurs
+        import tkinter
         from gui.interface import ZedNetGUI
         
         logger.info("Starting GUI...")
         gui = ZedNetGUI(controller)
         gui.run()
         
-    except ImportError as e:
-        logger.warning("GUI not available: %s", e)
-        logger.info("Running in headless mode. Press Ctrl+C to stop.")
+    except (ImportError, tkinter.TclError) as e:
+        logger.warning("GUI not available (%s), running in headless mode.", e)
+        logger.info("Press Ctrl+C to stop.")
         
         try:
             # Keep main thread alive
