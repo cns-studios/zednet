@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site Directory - ZedNet</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Site Directory</h1>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Site Name</th>
+                    <th>Info-Hash</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for site in sites %}
+                <tr>
+                    <td>{{ site.site_name }}</td>
+                    <td>{{ site.info_hash }}</td>
+                    <td>
+                        <a href="/site/{{ site.info_hash }}/index.html" target="_blank">Visit</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

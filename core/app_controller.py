@@ -6,6 +6,7 @@ from pathlib import Path
 import logging
 from typing import Dict, List, Optional
 import aiotorrent
+import threading
 
 from .security import SecurityManager
 from .storage import SiteStorage
@@ -26,7 +27,10 @@ class AppController:
         self.storage = SiteStorage(data_dir)
         self.publisher: Optional[SitePublisher] = None
         self.downloader: Optional[SiteDownloader] = None
+        self.directory_info_hash: Optional[str] = None
         self._online = False
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
 
     def initialize(self) -> bool:
         """
@@ -40,6 +44,7 @@ class AppController:
         try:
             self.publisher = SitePublisher(self.storage)
             self.downloader = SiteDownloader(self.storage)
+            self.thread.start()
             self._online = True
             logger.info("Application controller initialized successfully")
             return True
@@ -60,7 +65,20 @@ class AppController:
                 for site_id in list(self.downloader.active_downloads.keys()):
                     self.downloader.remove_site(site_id)
             self._online = False
+
+        if self.thread.is_alive():
+            self.loop.call_soon_threadsafe(self.loop.stop)
+            self.thread.join(timeout=2)
         logger.info("Application controller shutdown complete")
+
+    def run_async_and_wait(self, coro):
+        """
+        Run a coroutine on the background event loop and wait for the result.
+        """
+        if not self.thread.is_alive():
+            raise RuntimeError("Event loop is not running.")
+        future = asyncio.run_coroutine_threadsafe(coro, self.loop)
+        return future.result()
 
     # Site creation methods
     
@@ -107,38 +125,49 @@ class AppController:
         if self.downloader:
             self.downloader.remove_site(site_id, delete_files)
 
-    def delete_my_site(self, site_id: str, delete_key: bool = False):
+    async def delete_my_site(self, site_id: str, delete_key: bool = False) -> bool:
         """
         Delete one of my sites.
         This stops seeding and deletes all associated data.
+        This is an async method that runs blocking I/O in a separate thread.
         """
-        logger.info(f"Deleting my site: {site_id}")
-        # Stop seeding if active
-        if self.publisher and site_id in self.publisher.active_sites:
-            self.publisher.stop_seeding(site_id)
+        logger.info(f"Asynchronously deleting my site: {site_id}")
 
-        # Delete from storage
-        try:
-            self.storage.delete_site(site_id, delete_key)
-            logger.info(f"Successfully deleted site data for: {site_id}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to delete site {site_id}: {e}", exc_info=True)
-            return False
+        def blocking_delete():
+            """The blocking part of the deletion process."""
+            logger.info(f"Running blocking delete for site: {site_id}")
+            # Stop seeding if active
+            if self.publisher and site_id in self.publisher.active_sites:
+                self.publisher.stop_seeding(site_id)
+
+            # Delete from storage
+            try:
+                self.storage.delete_site(site_id, delete_key)
+                logger.info(f"Successfully deleted site data for: {site_id}")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to delete site {site_id}: {e}", exc_info=True)
+                return False
+
+        # Run the blocking I/O in a separate thread
+        success = await self.loop.run_in_executor(None, blocking_delete)
+        return success
     
     # Status methods
     
-    def get_vpn_status(self) -> Dict:
-        """Get current VPN status."""
-        return VPNChecker.check_vpn_status()
+    async def get_vpn_status(self) -> Dict:
+        """Get current VPN status asynchronously."""
+        # Run the blocking network I/O in a separate thread
+        return await self.loop.run_in_executor(None, VPNChecker.check_vpn_status)
     
     def is_p2p_online(self) -> bool:
         """Check if P2P engine is online."""
         return self._online
     
-    def get_my_sites(self) -> List[Dict]:
-        """Get list of my published sites."""
-        return self.storage.list_sites()
+    async def get_my_sites(self) -> List[Dict]:
+        """Get list of my published sites asynchronously."""
+        # Run the blocking file I/O in a separate thread
+        return await self.loop.run_in_executor(None, self.storage.list_sites)
     
     def get_downloads(self) -> List[Dict]:
         """Get list of downloading sites."""
@@ -154,10 +183,10 @@ class AppController:
         
         return downloads
     
-    def get_site_status(self, site_id: str) -> Optional[Dict]:
-        """Get status for a specific site."""
+    async def get_site_status(self, site_id: str) -> Optional[Dict]:
+        """Get status for a specific site asynchronously."""
         if self.publisher:
-            status = self.publisher.get_site_status(site_id)
+            status = await self.publisher.get_site_status(site_id)
             if status:
                 return status
         
@@ -166,7 +195,8 @@ class AppController:
             if status:
                 return status
         
-        metadata = self.storage.load_site_metadata(site_id)
+        metadata = await self.loop.run_in_executor(None, self.storage.load_site_metadata, site_id)
+
         if metadata and 'status' in metadata:
             return {"state": metadata['status']}
 

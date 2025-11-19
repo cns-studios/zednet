@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZedNet Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>ZedNet Dashboard</h1>
+        <p>Version: {{ version }}</p>
+        <p>Status: <span class="status-{{ status_class }}">{{ vpn_status }}</span></p>
+        <p>Local Server: <a href="http://{{ LOCAL_HOST }}:{{ port }}">http://{{ LOCAL_HOST }}:{{ port }}</a></p>
+
+        <h2>Actions</h2>
+        <ul>
+            <li><a href="/register">Register a Site</a></li>
+            <li><a href="/admin">Admin Panel</a></li>
+            <li><a href="/search">Search for Sites</a></li>
+            <li><a href="/pages">View All Sites</a></li>
+        </ul>
+    </div>
+</body>
+</html>

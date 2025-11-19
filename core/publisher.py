@@ -154,3 +154,34 @@ class SitePublisher:
             # Placeholder for stopping the seeding task
             del self.active_sites[site_id]
             logger.info(f"Stopped seeding site: {site_id}")
+
+    async def publish_directory(self) -> Optional[str]:
+        """
+        Create and seed a torrent for the sites.json directory.
+        Returns the info-hash of the directory torrent.
+        """
+        sites_json_path = self.storage.data_dir / 'sites.json'
+        if not sites_json_path.exists():
+            logger.error("sites.json not found, cannot publish directory.")
+            return None
+
+        try:
+            # Create a torrent for the sites.json file
+            directory_torrent_path = self.storage.data_dir / 'directory.torrent'
+            t = torf.Torrent(path=str(sites_json_path), trackers=[])
+            t.generate()
+            t.write(str(directory_torrent_path))
+
+            torrent = Torrent(str(directory_torrent_path))
+            await torrent.init()
+            info_hash = torrent.torrent_info['info_hash']
+
+            # Start seeding the directory torrent
+            await self._start_seeding('directory', torrent)
+
+            logger.info(f"Published new site directory with info-hash: {info_hash.hex()}")
+            return info_hash.hex()
+
+        except Exception as e:
+            logger.error(f"Failed to publish directory: {e}", exc_info=True)
+            return None
