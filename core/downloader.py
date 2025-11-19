@@ -110,3 +110,57 @@ class SiteDownloader:
 
         if delete_files:
             self.storage.delete_site(site_id)
+
+    async def download_directory(self, info_hash: str) -> Optional[bytes]:
+        """
+        Download the site directory torrent and return its content.
+        """
+        try:
+            info_hash_bytes = bytes.fromhex(info_hash)
+        except ValueError:
+            logger.error(f"Invalid info-hash format: {info_hash}")
+            return None
+
+        # Create a dummy torrent to start the download
+        dummy_torrent_path = self.storage.data_dir / "temp_dir.torrent"
+        dummy_torrent_data = {
+            b'info': {
+                b'name': b'directory',
+                b'piece length': 2**18,
+                b'pieces': b'',
+            },
+            b'info_hash': info_hash_bytes
+        }
+
+        # This is a workaround for aiotorrent's lack of magnet link support.
+        # We create a minimal torrent file with just the info_hash.
+        try:
+            torrent = Torrent.from_dict(dummy_torrent_data)
+        except Exception as e:
+            logger.error(f"Failed to create torrent from dict: {e}")
+            # Fallback to creating a file
+            with open(dummy_torrent_path, 'wb') as f:
+                f.write(bencode(dummy_torrent_data))
+            torrent = Torrent(str(dummy_torrent_path))
+
+
+        try:
+            await torrent.init(dht_enabled=True)
+
+            # We assume the directory torrent contains a single file, sites.json
+            if not torrent.files:
+                logger.error("Directory torrent has no files.")
+                return None
+
+            directory_file = torrent.files[0]
+
+            # Download the file content into memory
+            content = await torrent.read(directory_file)
+            return content
+
+        except Exception as e:
+            logger.error(f"Failed to download directory: {e}", exc_info=True)
+            return None
+        finally:
+            if dummy_torrent_path.exists():
+                dummy_torrent_path.unlink()

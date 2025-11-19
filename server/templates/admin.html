@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - ZedNet</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Admin Panel</h1>
+        <h2>Pending Submissions</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Site Name</th>
+                    <th>Info-Hash</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sub in submissions %}
+                <tr>
+                    <td>{{ sub.site_name }}</td>
+                    <td>{{ sub.info_hash }}</td>
+                    <td>
+                        <form action="/admin/approve" method="post" style="display:inline;">
+                            <input type="hidden" name="info_hash" value="{{ sub.info_hash }}">
+                            <button type="submit">Approve</button>
+                        </form>
+                        <form action="/admin/reject" method="post" style="display:inline;">
+                            <input type="hidden" name="info_hash" value="{{ sub.info_hash }}">
+                            <button type="submit">Reject</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

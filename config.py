@@ -23,6 +23,7 @@ for d in [DATA_DIR, CONTENT_DIR, KEYS_DIR, LOGS_DIR, QUARANTINE_DIR]:
 # Server settings
 LOCAL_HOST = '127.0.0.1'  # NEVER change to 0.0.0.0
 LOCAL_PORT = 9999
+PUBLISHER_URL = f"http://{LOCAL_HOST}:{LOCAL_PORT}"
 
 # Security settings
 REQUIRE_VPN_CHECK = True       # Check VPN before starting
