@@ -3,6 +3,8 @@ Modern theme for ZedNet GUI, inspired by Notion.
 Provides color palettes for light and dark modes.
 """
 
+import tkinter as tk
+
 class Theme:
     """Notion-inspired color and font theme for the ZedNet GUI."""
 
