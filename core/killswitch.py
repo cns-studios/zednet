@@ -76,7 +76,7 @@ class KillSwitch:
                         was_safe, self.is_safe, current_ip or 'UNKNOWN'
                     )
             
-            # CRITICAL: Trigger kill switch if VPN appears down
+            # Trigger kill switch if VPN appears down
             if not self.is_safe and not self._shutdown_triggered:
                 logger.critical("VPN CONNECTION LOST - TRIGGERING EMERGENCY SHUTDOWN")
                 self._trigger_emergency_shutdown(status)

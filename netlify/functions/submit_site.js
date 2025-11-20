@@ -1,12 +1,11 @@
 // Netlify serverless function to handle site submissions.
-// Path: netlify/functions/submit_site.js
 
 const fs = require('fs').promises;
 const path = require('path');
 
-// In a real application, the sites.json would be in a more persistent storage like a database
-// or a repository that gets rebuilt and deployed. For this example, we'll simulate by writing
-// to a file in a temporary directory, acknowledging Netlify's ephemeral filesystem.
+// The sites.json should be in a more persistent storage like a database
+// or a repository that gets rebuilt and deployed. For this first version, it'll write
+// to a file in a temporary directory.
 const SITES_FILE_PATH = path.join('/tmp', 'sites.json');
 
 async function readSites() {
@@ -41,14 +40,6 @@ exports.handler = async (event, context) => {
             return {
                 statusCode: 400,
                 body: JSON.stringify({ message: 'Missing required fields.' }),
-            };
-        }
-
-        // Basic security scan simulation
-        if (name.includes('<script>') || description.includes('<script>')) {
-             return {
-                statusCode: 400,
-                body: JSON.stringify({ message: 'Malicious content detected.' }),
             };
         }
 

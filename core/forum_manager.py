@@ -109,7 +109,6 @@ class ForumManager:
                 self.forum_data["posts"].append(post)
                 changed = True
             else:
-                # More complex merging logic for replies/votes would go here
                 pass
 
         if changed:
