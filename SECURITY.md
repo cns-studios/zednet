@@ -1,14 +1,8 @@
 # Security Policy
 
-## Supported Versions
-
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
-
 ## Reporting a Vulnerability
 
-**DO NOT** open public GitHub issues for security vulnerabilities.
+**Please** open public GitHub issues for security vulnerabilities.
 
 ### Response Time
 

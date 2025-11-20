@@ -71,11 +71,11 @@ pytest tests/test_security.py::TestPathSanitization -v
 
 ## Priority Areas
 
-- 🔴 **Security auditing** (critical)
-- 🟠 **BEP 46 implementation**
-- 🟡 **GUI improvements**
-- 🟢 **Documentation**
-- 🔵 **Cross-platform testing**
+- **Security auditing** (critical)
+- **BEP 46 implementation**
+- **GUI improvements**
+- **Documentation**
+- **Cross-platform testing**
 
 ## Questions?
 

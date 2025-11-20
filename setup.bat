@@ -1,6 +1,6 @@
 @echo off
 echo ======================================
-echo ZedNet Security-First Setup
+echo            ZedNet Setup
 echo ======================================
 
 python --version

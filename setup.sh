@@ -4,7 +4,7 @@
 set -e
 
 echo "======================================"
-echo "ZedNet Security-First Setup"
+echo "             ZedNet Setup"
 echo "======================================"
 
 # Check Python version

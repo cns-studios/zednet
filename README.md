@@ -2,9 +2,7 @@
 
 <div align="center">
 
-![ZedNet Logo](docs/images/logo.png)
-
-**Privacy-First | Censorship-Resistant | Peer-to-Peer**
+**Privacy Focused | Censorship-Resistant | Peer-to-Peer**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -24,29 +22,29 @@
 - **Alpha Software**: This is experimental software. Use at your own risk.
 - **Legal Responsibility**: You are solely responsible for content you create, distribute, or access.
 - **Anonymity Not Guaranteed**: VPN/Tor usage is recommended but not enforced by the protocol.
-- **No Content Moderation**: This is a decentralized system. Report illegal content using built-in tools.
+- **No Content Moderation**: This is a decentralized system. Report illegal content.
 - **Jurisdiction Matters**: Check local laws. ZedNet may be illegal in some jurisdictions.
 
 **By using ZedNet, you accept full responsibility for your actions.**
 
 ---
 
-## 📖 What is ZedNet?
+## What is ZedNet?
 
 ZedNet is a **privacy-focused, decentralized web platform** that enables:
 
-- 🔐 **Anonymous Publishing**: Host websites without revealing your identity
-- 🌍 **Censorship Resistance**: Content distributed via BitTorrent DHT
-- 🔄 **Mutable Content**: Update your site while keeping the same ID (BEP 46)
-- 🔒 **End-to-End Encryption**: All P2P traffic is encrypted
-- 🛡️ **Security First**: Built with security as the primary concern
+- **Anonymous Publishing**: Host websites without revealing your identity
+- **Censorship Resistance**: Content distributed via BitTorrent DHT
+- **Mutable Content**: Update your site while keeping the same ID (BEP 46)
+- **End-to-End Encryption**: All P2P traffic is encrypted
+- **Security First**: Built with security as the primary concern
 
 ### How It Works
 
 ```
 ┌─────────────┐         ┌──────────────┐         ┌─────────────┐
 │   Creator   │         │  BitTorrent  │         │   Visitor   │
-│             │────────▶│     DHT      │◀────────│             │
+│             │───────▶│     DHT       │◀───────│             │
 │ Publishes   │         │              │         │  Downloads  │
 │ via BEP 46  │         │ Distributed  │         │  & Seeds    │
 └─────────────┘         └──────────────┘         └─────────────┘
@@ -64,32 +62,32 @@ ZedNet is a **privacy-focused, decentralized web platform** that enables:
 
 ---
 
-## ✨ Features
+## Features
 
 ### Core Features
-- ✅ **Ed25519 Cryptographic Identity**: Immutable site IDs based on public keys
-- ✅ **BEP 46 Mutable Torrents**: Update content without changing the site ID
-- ✅ **Mandatory Encryption**: All P2P traffic encrypted (RC4/AES)
-- ✅ **Local Web Server**: Serve content via `http://127.0.0.1:9999`
-- ✅ **Cross-Platform**: Windows, macOS, Linux support
+- **Ed25519 Cryptographic Identity**: Immutable site IDs based on public keys
+- **BEP 46 Mutable Torrents**: Update content without changing the site ID
+- **Mandatory Encryption**: All P2P traffic encrypted (RC4/AES)
+- **Local Web Server**: Serve content via `http://127.0.0.1:9999`
+- **Cross-Platform**: Windows, macOS, Linux support
 
 ### Security Features
-- 🔒 **VPN Kill Switch**: Auto-shutdown on VPN disconnection
-- 🔒 **Path Traversal Protection**: Military-grade file access sanitization
-- 🔒 **Audit Logging**: Immutable logs of all security events
-- 🔒 **Content Scanning**: Hash-based malware detection
-- 🔒 **Rate Limiting**: DDoS protection on local server
-- 🔒 **Secure Key Storage**: Encrypted private key storage
+- **VPN Kill Switch**: Auto-shutdown on VPN disconnection   
+- **Path Traversal Protection**: Military-grade file access sanitization
+- **Audit Logging**: Immutable logs of all security events
+- **Content Scanning**: Hash-based malware detection
+- **Rate Limiting**: DDoS protection on local server
+- **Secure Key Storage**: Encrypted private key storage
 
 ### Privacy Features
-- 👁️ **Anonymous Mode**: No client fingerprinting
-- 👁️ **VPN Detection**: Warns if VPN appears inactive
-- 👁️ **Local-Only Server**: Never exposed to external network
-- 👁️ **No Telemetry**: Zero data collection
+- **Anonymous**: No client fingerprinting
+- **VPN Detection**: Warns if VPN appears inactive
+- **Local-Only Server**: Never exposed to external network
+- **No Telemetry**: Zero data collection
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ### Prerequisites
 
@@ -137,13 +135,10 @@ python main.py
 ```bash
 # Create virtual environment
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate.bat
+source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Run tests
-pytest tests/ -v
 
 # Start application
 python main.py
@@ -151,7 +146,7 @@ python main.py
 
 ---
 
-## 📚 Usage
+## Usage
 
 ### First Run
 
@@ -162,10 +157,10 @@ python main.py
 ### Creating a Site
 
 ```bash
-# Using the GUI (recommended)
+# Using the GUI (Automaticly open)
 python gui/interface.py
 
-# Using CLI
+# Using CLI (In beta)
 python -m tools.create_site ./my-website
 ```
 
@@ -174,6 +169,8 @@ This generates:
 - **Public Key**: Your ZedNet Site ID (share this)
 
 ### Publishing Content
+
+**Button in the GUI**
 
 ```python
 from core.publisher import SitePublisher
@@ -191,7 +188,7 @@ print(f"Site published: {site_id}")
 
 1. **Add Site**: Enter the ZedNet Site ID in the GUI
 2. **Download**: Content downloads automatically via P2P
-3. **Browse**: Open `http://127.0.0.1:9999/site/<SITE_ID>/index.html`
+3. **Browse**: Open `http://127.0.0.1:9999/site/<SITE_ID>/index.html` or use `http://127.0.0.1:9999/sites` to see all publicly listed ones
 
 ### Updating Your Site
 
@@ -209,7 +206,7 @@ publisher.update_site(
 
 ---
 
-## 🔒 Security
+## Security
 
 ### Security Model
 
@@ -239,37 +236,37 @@ ZedNet uses **defense-in-depth** security:
 
 ### Reporting Security Issues
 
-**DO NOT** open public issues for security vulnerabilities.
+**Please** open public issues for security vulnerabilities.
 
 
 See [SECURITY.md](SECURITY.md) for our responsible disclosure policy.
 
 ---
 
-## 🛡️ Legal Notice
+## Legal Notice
 
 ### Terms of Service
 
 By using ZedNet, you agree to:
 
-- ✅ Comply with all local laws and regulations
-- ✅ Not distribute illegal content (CSAM, malware, etc.)
-- ✅ Take responsibility for your anonymity (use VPN/Tor)
-- ✅ Report illegal content via the built-in reporting system
+- Comply with all local laws and regulations
+- Not distribute illegal content (CSAM, malware, etc.)
+- Take responsibility for your anonymity (use VPN/Tor)
+- Report illegal content via the built-in reporting system
 
 Full terms: [TERMS_OF_SERVICE.md](legal/TERMS_OF_SERVICE.md)
 
 ### Privacy Policy
 
 ZedNet does NOT collect:
-- ❌ Personal information
-- ❌ Browsing history
-- ❌ Telemetry data
+- Personal information
+- Browsing history
+- Telemetry data
 
 ZedNet DOES store locally:
-- ✅ Audit logs (on your device only)
-- ✅ Downloaded content (on your device only)
-- ✅ Your private keys (encrypted, on your device only)
+- Audit logs (on your device only)
+- Downloaded content (on your device only)
+- Your private keys (encrypted, on your device only)
 
 Full policy: [PRIVACY_POLICY.md](legal/PRIVACY_POLICY.md)
 
@@ -282,7 +279,7 @@ THE AUTHORS ARE NOT LIABLE FOR ANY MISUSE OR ILLEGAL ACTIVITY.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 zednet/
@@ -331,7 +328,7 @@ zednet/
 
 ---
 
-## 🧪 Development
+## Development
 
 ### Running Tests
 
@@ -374,17 +371,17 @@ pyinstaller --onefile --name zednet main.py
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 
 ### Priority Areas
 
-- 🔴 **Security auditing** (highest priority)
-- 🟠 **BEP 46 implementation** (partially complete)
-- 🟡 **GUI improvements** (PyQt5)
-- 🟢 **Documentation**
-- 🔵 **Cross-platform testing**
+- **Security auditing** (highest priority)
+- **BEP 46 implementation** (partially complete - not fully possible with the current `aiotorrent` libary)
+- **GUI improvements** (PyQt5)
+- **Documentation**
+- **Cross-platform testing**
 
 ### Development Setup
 
@@ -407,9 +404,9 @@ pytest tests/ -v
 
 ---
 
-## 📊 Project Status
+## Project Status
 
-### Completed ✅
+### Completed
 - [x] Core security framework
 - [x] Path traversal protection
 - [x] Audit logging
@@ -418,13 +415,13 @@ pytest tests/ -v
 - [x] Local web server
 - [x] Terms of Service / Privacy Policy
 
-### In Progress 🚧
+### In Progress
 - [ ] BEP 46 mutable torrent implementation (60%)
-- [ ] GUI application (30%)
+- [ ] GUI application (70%)
 - [ ] Site publishing tools (40%)
-- [ ] DHT integration (50%)
+- [ ] DHT integration (90%)
 
-### Planned 📋
+### Planned 
 - [ ] Tor integration
 - [ ] Multi-language support
 - [ ] Plugin system
@@ -433,7 +430,7 @@ pytest tests/ -v
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **BitTorrent Protocol**: For the DHT and mutable torrent spec (BEP 46)
 - **libtorrent**: Arvid Norberg and contributors
@@ -442,7 +439,7 @@ pytest tests/ -v
 
 ---
 
-## 📄 License
+## License
 
 ```
 MIT License
@@ -470,17 +467,16 @@ SOFTWARE.
 
 ---
 
-## 📞 Contact & Support
+## Contact & Support
 
 - **Issues**: [GitHub Issues](https://github.com/cns-studios/zednet/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/cns-studios/zednet/discussions)
-- **Matrix**: `#zednet:matrix.org`
 
 ---
 
 <div align="center">
 
-**⚡ Built with Privacy in Mind ⚡**
+**⚡ Built with Privacy in Mind**
 
 [⬆ Back to Top](#-zednet---decentralized-web-platform)
 
