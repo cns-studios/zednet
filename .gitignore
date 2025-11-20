@@ -2,7 +2,7 @@
 venv/
 env/
 
-# Data (NEVER commit)
+# Data
 data/
 *.key
 *.pem
@@ -33,3 +33,7 @@ Thumbs.db
 
 # Legal acceptance (personal)
 .terms_accepted
+
+# Temporary Images
+*.png
+*.jpg
