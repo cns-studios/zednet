@@ -2,8 +2,9 @@
 # This file tells Netlify how to build and deploy your site, including serverless functions.
 
 [build]
-  # This project doesn't have a static site build command, as it's a Python app.
-  # We only need to specify the functions directory.
+  # This command tells Netlify to install the Node.js dependencies for our serverless functions.
+  command = "cd netlify/functions && npm install"
+  # This specifies where the serverless functions are located.
   functions = "netlify/functions/"
 
 # The functions section is implicitly handled by the [build] settings above,

@@ -1,0 +1,14 @@
+{
+  "name": "zednet-netlify-functions",
+  "version": "1.0.0",
+  "description": "Serverless functions for ZedNet public index",
+  "main": "get_sites.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@upstash/redis": "^1.22.0"
+  }
+}
