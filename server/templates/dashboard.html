@@ -28,6 +28,10 @@
         <h3>Downloaded Sites</h3>
         <p class="value">{{ downloaded_sites_count }}</p>
     </div>
+    <div class="card">
+        <h3>Public Sites Index</h3>
+        <p><span class="status-indicator {{ 'online' if 'Successfully' in sites_json_status else 'offline' }}"></span>{{ sites_json_status }}</p>
+    </div>
 </div>
 
 <div class="card" style="margin-top: 20px;">

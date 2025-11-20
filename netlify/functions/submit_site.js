@@ -1,78 +1,66 @@
-// Netlify serverless function to handle site submissions.
+// netlify/functions/submit_site.js
+const { Redis } = require("@upstash/redis");
 
-const fs = require('fs').promises;
-const path = require('path');
+exports.handler = async function (event, context) {
+  // 1. Request Validation
+  if (event.httpMethod !== "POST") {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ error: "Method Not Allowed" }),
+      headers: { "Content-Type": "application/json" },
+    };
+  }
 
-// The sites.json should be in a more persistent storage like a database
-// or a repository that gets rebuilt and deployed. For this first version, it'll write
-// to a file in a temporary directory.
-const SITES_FILE_PATH = path.join('/tmp', 'sites.json');
-
-async function readSites() {
-    try {
-        await fs.access(SITES_FILE_PATH);
-        const data = await fs.readFile(SITES_FILE_PATH, 'utf-8');
-        return JSON.parse(data);
-    } catch (error) {
-        // If the file doesn't exist or is invalid JSON, start with an empty array
-        return [];
+  let newSite;
+  try {
+    newSite = JSON.parse(event.body);
+    // Basic validation: ensure required fields are present.
+    if (!newSite || !newSite.site_id || !newSite.name || !newSite.description) {
+      throw new Error("Invalid site data: missing required fields.");
     }
-}
+  } catch (error) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: "Bad Request: Invalid JSON or missing data." }),
+      headers: { "Content-Type": "application/json" },
+    };
+  }
 
-async function writeSites(sites) {
-    await fs.writeFile(SITES_FILE_PATH, JSON.stringify(sites, null, 2));
-}
+  // 2. Database Connection
+  try {
+    const redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
 
-exports.handler = async (event, context) => {
-    // Only allow POST requests
-    if (event.httpMethod !== 'POST') {
-        return {
-            statusCode: 405,
-            body: 'Method Not Allowed',
-        };
-    }
+    // 3. Add to Database
+    // We store the site object as a JSON string in a Redis Set.
+    // The Set automatically handles duplicates based on the string content.
+    await redis.sadd("sites", JSON.stringify({
+      name: newSite.name,
+      site_id: newSite.site_id,
+      description: newSite.description,
+      // Add a timestamp for when it was added to the index.
+      added_ts: new Date().toISOString()
+    }));
 
-    try {
-        const { name, site_id, description } = JSON.parse(event.body);
+    // 4. Success Response
+    return {
+      statusCode: 201, // 201 Created is more appropriate for a successful resource creation.
+      body: JSON.stringify({ message: "Site submitted successfully." }),
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    };
+  } catch (error) {
+    console.error("Error submitting site to Upstash:", error);
 
-        // Basic validation
-        if (!name || !site_id || !description) {
-            return {
-                statusCode: 400,
-                body: JSON.stringify({ message: 'Missing required fields.' }),
-            };
-        }
-
-        const sites = await readSites();
-
-        // Prevent duplicate site_id entries
-        if (sites.some(site => site.site_id === site_id)) {
-            return {
-                statusCode: 409,
-                body: JSON.stringify({ message: 'This site ID has already been submitted.' }),
-            };
-        }
-
-        const newSite = {
-            name,
-            site_id,
-            description,
-            submitted_at: new Date().toISOString(),
-        };
-
-        sites.push(newSite);
-        await writeSites(sites);
-
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ message: 'Site submitted successfully!' }),
-        };
-
-    } catch (error) {
-        console.error('Error processing submission:', error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ message: 'An internal error occurred.' }),
-        };
-    }
+    // 5. Error Response
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Internal Server Error: Could not submit site." }),
+      headers: { "Content-Type": "application/json" },
+    };
+  }
 };

@@ -4,6 +4,9 @@ Production-hardened local web server.
 from flask import Flask, send_file, abort, render_template, request, flash, redirect, url_for
 from pathlib import Path
 import requests
+from dotenv import load_dotenv
+import os
+import threading
 from core.security import SecurityManager
 from core.audit_log import AuditLogger
 from core.storage import SiteStorage
@@ -13,6 +16,12 @@ import time
 import json
 
 logger = logging.getLogger(__name__)
+
+# Load environment variables from .env file
+load_dotenv()
+SITES_JSON_URL = os.getenv("SITES_JSON_URL")
+SUBMIT_SITE_URL = os.getenv("SUBMIT_SITE_URL")
+
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.config['DEBUG'] = False
@@ -24,6 +33,45 @@ audit_logger: AuditLogger = None
 content_dir: Path = None
 storage: SiteStorage = None
 app_controller = None # Injected AppController instance
+last_sites_json_update_status = "Not yet run."
+
+def fetch_and_update_sites_json():
+    """Fetches the sites.json from the central repository and updates the local copy."""
+    global last_sites_json_update_status
+    if not SITES_JSON_URL:
+        last_sites_json_update_status = "Error: SITES_JSON_URL is not set in .env file."
+        logger.error(last_sites_json_update_status)
+        return
+
+    try:
+        logger.info("Fetching public sites list from %s", SITES_JSON_URL)
+        response = requests.get(SITES_JSON_URL, timeout=15)
+        response.raise_for_status()  # Raises an exception for 4xx or 5xx status codes
+
+        sites_data = response.json()
+        sites_file = storage.data_dir / "sites.json"
+        with open(sites_file, 'w', encoding='utf-8') as f:
+            json.dump(sites_data, f, indent=2)
+
+        last_sites_json_update_status = f"Successfully updated at {time.strftime('%Y-%m-%d %H:%M:%S')}"
+        logger.info("Successfully updated sites.json")
+
+    except requests.exceptions.RequestException as e:
+        last_sites_json_update_status = f"Error: Failed to fetch from API. Using local copy. Details: {e}"
+        logger.error(last_sites_json_update_status)
+    except json.JSONDecodeError as e:
+        last_sites_json_update_status = f"Error: Failed to parse JSON from API. Using local copy. Details: {e}"
+        logger.error(last_sites_json_update_status)
+    except IOError as e:
+        last_sites_json_update_status = f"Error: Failed to write to local sites.json. Details: {e}"
+        logger.error(last_sites_json_update_status)
+
+
+def periodic_sites_json_updater():
+    """Runs the updater function in a loop every 5 minutes."""
+    while True:
+        fetch_and_update_sites_json()
+        time.sleep(300) # 300 seconds = 5 minutes
 
 # Rate limiting
 request_times = {}
@@ -73,7 +121,8 @@ def dashboard():
         vpn_status=app_controller.get_vpn_status(),
         my_sites_count=len(app_controller.get_my_sites()),
         downloaded_sites_count=len(app_controller.get_downloads()),
-        my_sites=app_controller.get_my_sites()
+        my_sites=app_controller.get_my_sites(),
+        sites_json_status=last_sites_json_update_status
     )
 
 def _get_public_sites():
@@ -131,22 +180,28 @@ def add_site():
             flash('All fields are required.', 'danger')
             return redirect(url_for('add_site'))
 
-        # Run the submission in the background
-        async def do_submit():
-            success = await app_controller.submit_site_for_registration(
-                site_name, site_id, description
-            )
-            if success:
-                flash('Your site has been submitted for review!', 'success')
+        # New: Submit to the central API
+        if not SUBMIT_SITE_URL:
+            flash('Error: SUBMIT_SITE_URL is not configured in the .env file.', 'danger')
+            return redirect(url_for('add_site'))
+
+        try:
+            payload = {
+                "name": site_name,
+                "site_id": site_id,
+                "description": description
+            }
+            response = requests.post(SUBMIT_SITE_URL, json=payload, timeout=15)
+            response.raise_for_status() # Check for HTTP errors
+
+            if response.status_code == 201:
+                flash('Your site has been submitted to the public index!', 'success')
             else:
-                flash('There was an error submitting your site. Please try again.', 'danger')
+                flash(f"Received an unexpected status from the API: {response.status_code}", 'warning')
 
-        # This is a simple way to run an async task from a sync Flask route
-        # In a more complex app, a task queue like Celery would be better.
-        app_controller.loop.call_soon_threadsafe(asyncio.create_task, do_submit())
+        except requests.exceptions.RequestException as e:
+            flash(f"There was an error submitting your site: {e}", 'danger')
 
-        # Redirect immediately, feedback will be on the next page load
-        flash("Your submission is being processed...", "info")
         return redirect(url_for('add_site'))
 
     return render_template('add_site.html')
@@ -273,6 +328,10 @@ def initialize_server(controller, audit_log: AuditLogger, content_directory: Pat
     audit_logger = audit_log
     content_dir = content_directory
     storage = site_storage
+
+    # Start the background thread for updating sites.json
+    updater_thread = threading.Thread(target=periodic_sites_json_updater, daemon=True)
+    updater_thread.start()
 
 
 def run_server(host='127.0.0.1', port=9999):

@@ -87,6 +87,43 @@ ZedNet is a **privacy-focused, decentralized web platform** that enables:
 
 ---
 
+## Public Site Index (Optional)
+
+While ZedNet is fully decentralized for content sharing, a centralized public index is necessary for site discovery and moderation. This is due to limitations in the underlying `aiotorrent` library (specifically, the lack of support for mutable torrents, BEP46) which prevent a fully decentralized discovery mechanism.
+
+The provided serverless functions allow anyone to host their own public index for a community. This is a compromise that allows for:
+- **Moderation:** A central point to curate a list of public sites.
+- **Discoverability:** A simple way for users to find new content.
+- **Contributions Welcome:** We encourage the community to help improve the DHT-based discovery features to remove the need for this centralized index.
+
+### Hosting Your Own Index
+
+You can host your own public index for free using Netlify and Upstash.
+
+**1. Set up Upstash Redis:**
+- Create a free account at [Upstash](https://upstash.com/).
+- Create a new Redis database.
+- Copy the `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` from your database details page.
+
+**2. Deploy to Netlify:**
+- Fork this repository to your GitHub account.
+- Create a new site on Netlify and connect it to your forked repository.
+- In your Netlify site's "Site configuration" -> "Environment variables", add the following two variables:
+  - `UPSTASH_REDIS_REST_URL`: The value you copied from Upstash.
+  - `UPSTASH_REDIS_REST_TOKEN`: The value you copied from Upstash.
+- Netlify will automatically detect the `netlify.toml` file and deploy the serverless functions from the `netlify/functions` directory.
+
+**3. Configure Your Local ZedNet App:**
+- In the root of your local ZedNet project, create a file named `.env` by copying the `.env.example` file.
+- Edit the `.env` file and replace the placeholder URLs with your actual Netlify function URLs:
+  ```
+  SITES_JSON_URL="https://your-netlify-site-name.netlify.app/.netlify/functions/get_sites"
+  SUBMIT_SITE_URL="https://your-netlify-site-name.netlify.app/.netlify/functions/submit_site"
+  ```
+- Start the ZedNet application. It will now use your public index for site discovery and submission.
+
+---
+
 ## Installation
 
 ### Prerequisites
