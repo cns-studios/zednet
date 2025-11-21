@@ -17,9 +17,7 @@ def run_verification():
         page.goto("http://localhost:9999/add-site")
         page.screenshot(path="add_site.png")
 
-        # Forum page
-        page.goto("http://localhost:9999/forum")
-        page.screenshot(path="forum.png")
+
 
         browser.close()
 

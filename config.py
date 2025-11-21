@@ -21,7 +21,7 @@ for d in [DATA_DIR, CONTENT_DIR, KEYS_DIR, LOGS_DIR, QUARANTINE_DIR]:
     d.mkdir(exist_ok=True, mode=0o700)
 
 # Server settings
-LOCAL_HOST = '127.0.0.1'  # NEVER change to 0.0.0.0
+LOCAL_HOST = '127.0.0.1'
 LOCAL_PORT = 9999
 
 # Security settings

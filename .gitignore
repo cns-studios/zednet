@@ -1,6 +1,9 @@
-# Virtual environment
+# Virtual environment & temp files
 venv/
 env/
+*node_modules*
+package-lock.json
+*.env
 
 # Data
 data/
@@ -37,5 +40,6 @@ Thumbs.db
 # Temporary Images
 *.png
 *.jpg
+
 # Local Netlify folder
 .netlify

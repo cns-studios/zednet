@@ -96,6 +96,20 @@ The provided serverless functions allow anyone to host their own public index fo
 - **Discoverability:** A simple way for users to find new content.
 - **Contributions Welcome:** We encourage the community to help improve the DHT-based discovery features to remove the need for this centralized index.
 
+### Use official Pubic Site Index (Recommended)
+**The official Site Index moderates malicious sites and has the largest know site pool**. If you whish to add your Own Index or a Site to the public Index, open a Github Issue and upload your `sites.json` file. Our team will check it and merge the contents to the official index.
+
+
+**1. Set up .env file**
+- Create a `.env` file in your zednet directory and copy these URLs:
+    ```
+    SITES_JSON_URL="https://69209cbcd7387f152410e363--zednet-backend.netlify.app/.netlify/functions/get_sites"
+    SUBMIT_SITE_URL="https://69209cbcd7387f152410e363--zednet-backend.netlify.app/.netlify/functions/submit_site"
+   ```
+- Thats it! Youre all set and can skip the other parts of this section.
+
+
+
 ### Hosting Your Own Index
 
 You can host your own public index for free using Netlify and Upstash.
@@ -114,7 +128,7 @@ You can host your own public index for free using Netlify and Upstash.
 - Netlify will automatically detect the `netlify.toml` file and deploy the serverless functions from the `netlify/functions` directory.
 
 **3. Configure Your Local ZedNet App:**
-- In the root of your local ZedNet project, create a file named `.env` by copying the `.env.example` file.
+- In the root of your local ZedNet project, create a file named `.env`.
 - Edit the `.env` file and replace the placeholder URLs with your actual Netlify function URLs:
   ```
   SITES_JSON_URL="https://your-netlify-site-name.netlify.app/.netlify/functions/get_sites"

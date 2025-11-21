@@ -15,7 +15,7 @@ from .storage import SiteStorage
 from .publisher import SitePublisher
 from .downloader import SiteDownloader
 from .vpn_check import VPNChecker
-from .forum_manager import ForumManager
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class AppController:
         self.storage = SiteStorage(data_dir)
         self.publisher: Optional[SitePublisher] = None
         self.downloader: Optional[SiteDownloader] = None
-        self.forum_manager: Optional[ForumManager] = None
+
         self._online = False
 
         # Asyncio event loop management
@@ -49,7 +49,7 @@ class AppController:
         try:
             self.publisher = SitePublisher(self.storage)
             self.downloader = SiteDownloader(self.storage)
-            self.forum_manager = ForumManager(self.storage.data_dir, self.downloader)
+
             self._online = True
             logger.info("Application controller initialized successfully")
             return True

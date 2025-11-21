@@ -207,36 +207,6 @@ def add_site():
     return render_template('add_site.html')
 
 
-@app.route('/forum', methods=['GET'])
-@rate_limit
-def forum():
-    """Display the forum page."""
-    if not app_controller or not app_controller.forum_manager:
-        abort(503, "Forum not initialized")
-
-    forum_data = app_controller.forum_manager.get_all_posts()
-    return render_template('forum.html', forum_data=forum_data)
-
-
-@app.route('/forum/new', methods=['POST'])
-@rate_limit
-def new_forum_post():
-    """Handle new post submission."""
-    if not app_controller or not app_controller.forum_manager:
-        abort(503, "Forum not initialized")
-
-    author = request.form.get('author', 'Anonymous')
-    content = request.form.get('content')
-
-    if not content:
-        flash("Content is required for a post.", "danger")
-    else:
-        app_controller.forum_manager.add_post(author, content)
-        flash("Your post has been added!", "success")
-
-    return redirect(url_for('forum'))
-
-
 @app.route('/site/<site_id>/<path:filepath>')
 @rate_limit
 def serve_site(site_id: str, filepath: str):
