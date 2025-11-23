@@ -97,7 +97,7 @@ The provided serverless functions allow anyone to host their own public index fo
 - **Contributions Welcome:** We encourage the community to help improve the DHT-based discovery features to remove the need for this centralized index.
 
 ### Use official Pubic Site Index (Recommended)
-**The official Site Index moderates malicious sites and has the largest know site pool**. If you whish to add your Own Index or a Site to the public Index, open a Github Issue and upload your `sites.json` file. Our team will check it and merge the contents to the official index.
+**The official Site Index moderates malicious sites and has the largest known site pool**. If you whish to add your Own Index or a Site to the public Index, open a Github Issue and upload your `sites.json` file. Our team will check it and merge the contents to the official index.
 
 
 **1. Set up .env file**
